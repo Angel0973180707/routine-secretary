@@ -1,1 +1,443 @@
+作息秘書v17.1css(中)
 
+/* =========================
+
+作息秘書 v17（穩定字體版）
+
+目標：好讀、不擠、手機友善
+
+========================= */
+
+/* ---------- Root Theme ---------- */
+
+:root{
+
+--bg:#0b241d;
+
+--panel:#12352c;
+
+--panel2:#0f2f27;
+
+--card:#164238;
+
+--card2:#1a4b40;
+
+--text:#eaf7f1;
+
+--muted:rgba(234,247,241,.78);
+
+--line:rgba(255,255,255,.08);
+
+--accent:#39d6a6;
+
+--accent2:#74f0c8;
+
+/* 🔽 字體調小（穩定版） */
+
+--fsBase: 17px;
+
+--fsS: 15px;
+
+--fsM: 17px;
+
+--fsL: 20px;
+
+--fsXL: 26px;
+
+--fsTimer: 44px;
+
+--radius: 16px;
+
+--shadow: 0 10px 25px rgba(0,0,0,.25);
+
+}
+
+/* ---------- Base ---------- */
+
+*{box-sizing:border-box;}
+
+html,body{height:100%;}
+
+body{
+
+margin:0;
+
+background:
+
+radial-gradient(1200px 800px at 30% 0%, rgba(57,214,166,.14), transparent 50%),
+
+radial-gradient(1000px 700px at 90% 10%, rgba(116,240,200,.10), transparent 55%),
+
+var(--bg);
+
+color:var(--text);
+
+font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC",
+
+"PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+
+font-size: var(--fsBase);
+
+line-height: 1.55;
+
+}
+
+/* ---------- Layout ---------- */
+
+.app{
+
+max-width: 980px;
+
+margin: 0 auto;
+
+padding-bottom: 28px;
+
+}
+
+.topbar{
+
+padding: 16px 14px 8px;
+
+display:flex;
+
+align-items:center;
+
+justify-content:space-between;
+
+gap:12px;
+
+}
+
+.brandTitle{
+
+font-size: var(--fsXL);
+
+font-weight: 900;
+
+letter-spacing:.4px;
+
+}
+
+.brandSub{
+
+font-size: var(--fsM);
+
+color: var(--muted);
+
+margin-top: 4px;
+
+}
+
+/* ---------- Buttons ---------- */
+
+button{
+
+font-family: inherit;
+
+cursor:pointer;
+
+-webkit-tap-highlight-color: transparent;
+
+}
+
+.btnPrimary{
+
+border:0;
+
+background: linear-gradient(180deg, var(--accent2), var(--accent));
+
+color:#083025;
+
+font-weight: 900;
+
+font-size: 18px;
+
+padding: 14px 16px;
+
+border-radius: 14px;
+
+box-shadow: 0 8px 16px rgba(57,214,166,.18);
+
+}
+
+.btnGhost{
+
+border:1px solid rgba(255,255,255,.16);
+
+background: rgba(0,0,0,.14);
+
+color: var(--text);
+
+font-weight: 800;
+
+font-size: 16px;
+
+padding: 12px 14px;
+
+border-radius: 14px;
+
+}
+
+.btnGhost.danger{
+
+border-color: rgba(255,120,120,.35);
+
+color: rgba(255,220,220,.95);
+
+}
+
+/* ---------- Tabs ---------- */
+
+.tabs{
+
+display:flex;
+
+gap:8px;
+
+padding: 8px 12px;
+
+background: rgba(0,0,0,.12);
+
+border: 1px solid rgba(255,255,255,.06);
+
+border-radius: 999px;
+
+margin: 0 12px 12px;
+
+}
+
+.tab{
+
+flex:1;
+
+border:0;
+
+background: rgba(255,255,255,.08);
+
+color: var(--text);
+
+font-weight: 900;
+
+font-size: 17px;
+
+padding: 12px 8px;
+
+border-radius: 999px;
+
+}
+
+.tab.active{
+
+background: rgba(57,214,166,.22);
+
+border: 1px solid rgba(57,214,166,.35);
+
+}
+
+/* ---------- Main ---------- */
+
+.main{padding: 0 12px;}
+
+.view{display:none;}
+
+.view.active{display:block;}
+
+.panel{
+
+background: linear-gradient(180deg, rgba(18,53,44,.92), rgba(15,47,39,.92));
+
+border: 1px solid rgba(255,255,255,.06);
+
+border-radius: var(--radius);
+
+box-shadow: var(--shadow);
+
+padding: 14px;
+
+margin: 12px 0;
+
+}
+
+.panelTitle{
+
+font-size: 20px;
+
+font-weight: 900;
+
+}
+
+.panelHint{
+
+font-size: 15px;
+
+color: var(--muted);
+
+}
+
+/* ---------- Cards ---------- */
+
+.cards{
+
+display:grid;
+
+grid-template-columns: repeat(3, 1fr);
+
+gap: 12px;
+
+}
+
+@media (max-width: 760px){
+
+.cards{grid-template-columns: 1fr;}
+
+}
+
+.card{
+
+border: 1px solid rgba(255,255,255,.06);
+
+background: linear-gradient(180deg, rgba(22,66,56,.92), rgba(18,53,44,.92));
+
+border-radius: 16px;
+
+padding: 16px;
+
+box-shadow: 0 10px 20px rgba(0,0,0,.25);
+
+}
+
+.cardTop{display:flex; align-items:center; gap:10px;}
+
+.emoji{font-size: 26px;}
+
+.cardName{font-size: 20px; font-weight: 900;}
+
+.cardDesc{margin-top: 8px; font-size: 16px; color: var(--muted);}
+
+.cardTag{
+
+margin-top: 10px;
+
+display:inline-block;
+
+font-size: 15px;
+
+font-weight: 900;
+
+padding: 6px 10px;
+
+border-radius: 999px;
+
+background: rgba(57,214,166,.14);
+
+border: 1px solid rgba(57,214,166,.22);
+
+}
+
+/* 🔒 卡片內全部白字 */
+
+.card, .card *{ color:#fff !important; }
+
+/* ---------- Timer ---------- */
+
+.timerBig{
+
+font-size: var(--fsTimer);
+
+font-weight: 950;
+
+letter-spacing: 1px;
+
+}
+
+.timerSub{
+
+font-size: 16px;
+
+color: var(--muted);
+
+margin-bottom: 12px;
+
+}
+
+.btnRow{
+
+display:flex;
+
+gap: 8px;
+
+justify-content:center;
+
+flex-wrap:wrap;
+
+}
+
+/* ---------- Forms ---------- */
+
+.kbLabel{font-size: 15px; color: var(--muted); font-weight: 800;}
+
+.kbInput{
+
+width:100%;
+
+padding: 12px;
+
+border-radius: 12px;
+
+border: 1px solid rgba(255,255,255,.10);
+
+background: rgba(0,0,0,.18);
+
+color: var(--text);
+
+font-size: 16px;
+
+}
+
+/* ---------- Chips ---------- */
+
+.chip, .chip2{
+
+border: 1px solid rgba(255,255,255,.10);
+
+background: rgba(255,255,255,.06);
+
+color: var(--text);
+
+font-weight: 900;
+
+font-size: 15px;
+
+padding: 8px 12px;
+
+border-radius: 999px;
+
+}
+
+.chip.active, .chip2.active{
+
+background: rgba(57,214,166,.22);
+
+border-color: rgba(57,214,166,.35);
+
+}
+
+/* ---------- Dialog ---------- */
+
+.dlg{
+
+border: 1px solid rgba(255,255,255,.10);
+
+border-radius: 16px;
+
+background: rgba(14,43,35,.98);
+
+color: var(--text);
+
+padding: 14px;
+
+}
+
+.dlgTitle{font-size: 20px; font-weight: 950;}
+
+.dlgBody{font-size: 16px; color: var(--muted);}
