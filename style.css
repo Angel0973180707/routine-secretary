@@ -441,3 +441,55 @@ padding: 14px;
 .dlgTitle{font-size: 20px; font-weight: 950;}
 
 .dlgBody{font-size: 16px; color: var(--muted);}
+/* =========================
+   v17.1.1 全站白字補丁（貼在 CSS 最底部）
+   目的：把黑字全部拉成白字，含表單/placeholder/select/option
+========================= */
+
+/* 1) 全站預設文字 */
+body, .app, .panel, .tabs, .tab, .chip, .chip2,
+.card, .dlg, .dlg *{
+  color: var(--text) !important;
+}
+
+/* 2) 標題/說明文字（避免被瀏覽器預設黑字干擾） */
+.brandTitle, .brandSub,
+.panelTitle, .panelHint,
+.kbLabel, .timerSub,
+.cardName, .cardDesc, .cardTag{
+  color: var(--text) !important;
+}
+
+/* 3) 表單：input/textarea/select 的文字與背景 */
+input, textarea, select{
+  color: var(--text) !important;
+  background: rgba(0,0,0,.18) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+}
+
+/* 4) placeholder（最常出現黑字的地方） */
+input::placeholder,
+textarea::placeholder{
+  color: rgba(234,247,241,.65) !important;
+}
+
+/* 5) 下拉選單的 option（Android/某些瀏覽器會用系統預設黑字） */
+select option{
+  color: #ffffff !important;
+  background: #0f2f27 !important;
+}
+
+/* 6) 按鈕：確保 ghost / chip / tab 文字不變黑 */
+button, .btnGhost, .btnPrimary, .tab, .chip, .chip2{
+  color: var(--text) !important;
+}
+
+/* 7) 若某些區塊被套到白底（導致黑字），強制改暗底白字 */
+.panel, .card, .dlg{
+  background-color: rgba(18,53,44,.92) !important;
+}
+
+/* 8) 提醒：連結若有 */
+a, a:visited{
+  color: var(--accent2) !important;
+}
