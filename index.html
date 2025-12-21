@@ -1,341 +1,535 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <meta name="theme-color" content="#0b241d" />
-
-  <title>作息秘書 v17</title>
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="./style.css" />
-</head>
-
-<body>
-
 <!-- =========================
+
 作息秘書 v17（完整 HTML）
 
 - v16 基礎上新增「系統計時器」按鈕（微休息/護眼/番茄）
+
 - 關係滋養區 + 生日提醒 + 知識區 保留
+
 ========================= -->
 
 <div id="app" class="app">
 
-  <!-- Top -->
-  <header class="topbar">
-    <div class="brand">
-      <div class="brandTitle">作息秘書</div>
-      <div class="brandSub">
-        <span>作息提醒＋關係滋養</span>
-      </div>
-    </div>
-    <button id="btnInstallHelp" class="btnGhost" type="button">安裝教學</button>
-  </header>
+<!-- Top -->
 
-  <!-- Tabs -->
-  <nav class="tabs" aria-label="主選單">
-    <button class="tab active" data-view="home" type="button">首頁</button>
-    <button class="tab" data-view="micro" type="button">微休息</button>
-    <button class="tab" data-view="eye" type="button">護眼</button>
-    <button class="tab" data-view="pomo" type="button">蕃茄</button>
-  </nav>
+<header class="topbar">
 
-  <!-- Main -->
-  <main class="main">
+<div class="brand">
 
-    <!-- HOME -->
-    <section class="view active" id="view-home">
+<div class="brandTitle">作息秘書</div>
 
-      <!-- Quick Cards -->
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">
-            <span class="dotLed"></span>
-            選一個模式
-          </div>
-          <div class="panelHint">點卡片或上方按鈕都可切換。</div>
-        </div>
+<div class="brandSub">
 
-        <div class="cards">
-          <button class="card" data-jump="micro" type="button">
-            <div class="cardTop">
-              <div class="emoji">⏱️</div>
-              <div class="cardName">微休息</div>
-            </div>
-            <div class="cardDesc">60 秒｜眼睛 or 回身</div>
-            <div class="cardTag">點我開始</div>
-          </button>
-
-          <button class="card" data-jump="eye" type="button">
-            <div class="cardTop">
-              <div class="emoji">👁️</div>
-              <div class="cardName">護眼</div>
-            </div>
-            <div class="cardDesc">20-20-20｜放鬆對焦</div>
-            <div class="cardTag">點我開始</div>
-          </button>
-
-          <button class="card" data-jump="pomo" type="button">
-            <div class="cardTop">
-              <div class="emoji">🍅</div>
-              <div class="cardName">蕃茄模式</div>
-            </div>
-            <div class="cardDesc">專注＋休息｜節奏管理</div>
-            <div class="cardTag">點我開始</div>
-          </button>
-        </div>
-
-        <div class="note">
-          <div class="noteTitle">小提醒</div>
-          <div class="noteText">
-            第一次按「開始」可能會觸發瀏覽器允許語音（倒數結束才會播報）。
-          </div>
-        </div>
-      </div>
-
-      <!-- Knowledge -->
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">📚 知識區（平日收集）</div>
-          <div class="panelHint">可新增、刪除、篩選、匯出、清空、永久保存</div>
-        </div>
-
-        <form id="kbForm" class="kbForm" autocomplete="off">
-          <label class="kbField">
-            <span class="kbLabel">分類</span>
-            <select id="kbCat" class="kbInput">
-              <option value="護眼">護眼</option>
-              <option value="經絡">經絡</option>
-              <option value="學習效率">學習效率</option>
-              <option value="筆記">筆記</option>
-            </select>
-          </label>
-
-          <label class="kbField kbFieldGrow">
-            <span class="kbLabel">標題</span>
-            <input id="kbTitle" class="kbInput" type="text" maxlength="50" placeholder="例如：20-20-20 的重點" />
-          </label>
-
-          <label class="kbField kbFieldGrow">
-            <span class="kbLabel">內容</span>
-            <input id="kbText" class="kbInput" type="text" maxlength="160" placeholder="例如：每 20 分鐘看遠 20 呎 20 秒" />
-          </label>
-
-          <button class="btnPrimary" type="submit">新增</button>
-        </form>
-
-        <div class="kbToolbar">
-          <div class="kbFilter">
-            <span class="kbFilterLabel">篩選：</span>
-            <button class="chip active" data-filter="全部" type="button">全部</button>
-            <button class="chip" data-filter="護眼" type="button">護眼</button>
-            <button class="chip" data-filter="經絡" type="button">經絡</button>
-            <button class="chip" data-filter="學習效率" type="button">學習效率</button>
-            <button class="chip" data-filter="筆記" type="button">筆記</button>
-          </div>
-
-          <div class="kbActions">
-            <button id="kbExport" class="btnGhost" type="button">匯出</button>
-            <button id="kbClear" class="btnGhost danger" type="button">清空全部</button>
-          </div>
-        </div>
-
-        <div id="kbEmpty" class="kbEmpty">尚無資料</div>
-        <div id="kbList" class="kbList" aria-live="polite"></div>
-      </div>
-
-      <!-- Relationship Nourish -->
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">🌿 關係滋養區</div>
-          <div class="panelHint">親子／伴侶／人際／自己：每日一句提醒、一次練習、一次靠近</div>
-        </div>
-
-        <form id="relForm" class="relForm" autocomplete="off">
-          <label class="kbField">
-            <span class="kbLabel">面向</span>
-            <select id="relCat" class="kbInput">
-              <option value="親子">親子</option>
-              <option value="伴侶">伴侶</option>
-              <option value="人際">人際</option>
-              <option value="自己">自己</option>
-            </select>
-          </label>
-
-          <label class="kbField kbFieldGrow">
-            <span class="kbLabel">一句話 / 目標</span>
-            <input id="relTitle" class="kbInput" type="text" maxlength="50" placeholder="例如：先聽完再說、先抱一下" />
-          </label>
-
-          <label class="kbField kbFieldGrow">
-            <span class="kbLabel">練習 / 行動</span>
-            <input id="relText" class="kbInput" type="text" maxlength="180" placeholder="例如：今天 3 次『看著眼睛說謝謝』" />
-          </label>
-
-          <label class="kbField">
-            <span class="kbLabel">頻率</span>
-            <select id="relFreq" class="kbInput">
-              <option value="今天">今天</option>
-              <option value="每天">每天</option>
-              <option value="每週">每週</option>
-            </select>
-          </label>
-
-          <button class="btnPrimary" type="submit">新增</button>
-        </form>
-
-        <div class="kbToolbar">
-          <div class="kbFilter">
-            <span class="kbFilterLabel">篩選：</span>
-            <button class="chip2 active" data-relfilter="全部" type="button">全部</button>
-            <button class="chip2" data-relfilter="親子" type="button">親子</button>
-            <button class="chip2" data-relfilter="伴侶" type="button">伴侶</button>
-            <button class="chip2" data-relfilter="人際" type="button">人際</button>
-            <button class="chip2" data-relfilter="自己" type="button">自己</button>
-          </div>
-
-          <div class="kbActions">
-            <button id="relExport" class="btnGhost" type="button">匯出</button>
-            <button id="relClear" class="btnGhost danger" type="button">清空全部</button>
-          </div>
-        </div>
-
-        <div id="relEmpty" class="kbEmpty">尚無資料</div>
-        <div id="relList" class="kbList" aria-live="polite"></div>
-      </div>
-
-      <!-- Birthday Reminder -->
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">🎂 生日提醒</div>
-          <div class="panelHint">到點會跳出提醒＋語音播報（在 app 開著時生效）</div>
-        </div>
-
-        <div id="bdayToday" class="kbEmpty" style="display:none;"></div>
-
-        <form id="bdayForm" class="bdayForm" autocomplete="off">
-          <label class="kbField kbFieldGrow">
-            <span class="kbLabel">對象</span>
-            <input id="bdayName" class="kbInput" type="text" maxlength="24" placeholder="例如：濬宇 / 妍蓁 / 媽媽 / 朋友" />
-          </label>
-
-          <label class="kbField">
-            <span class="kbLabel">日期</span>
-            <input id="bdayDate" class="kbInput" type="date" />
-          </label>
-
-          <label class="kbField">
-            <span class="kbLabel">提醒時間</span>
-            <input id="bdayTime" class="kbInput" type="time" value="09:00" />
-          </label>
-
-          <label class="kbField kbFieldGrow">
-            <span class="kbLabel">提醒一句話</span>
-            <input id="bdayMsg" class="kbInput" type="text" maxlength="60" placeholder="例如：記得傳祝福、打電話、準備小卡" />
-          </label>
-
-          <button class="btnPrimary" type="submit">新增</button>
-        </form>
-
-        <div class="kbToolbar">
-          <div class="kbActions">
-            <button id="bdayExport" class="btnGhost" type="button">匯出</button>
-            <button id="bdayClear" class="btnGhost danger" type="button">清空全部</button>
-          </div>
-        </div>
-
-        <div id="bdayEmpty" class="kbEmpty">尚無資料</div>
-        <div id="bdayList" class="kbList" aria-live="polite"></div>
-      </div>
-
-    </section>
-
-    <!-- MICRO -->
-    <section class="view" id="view-micro">
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">⏱️ 微休息｜60 秒</div>
-          <div class="panelHint">眼睛放鬆、肩頸轉動、起身走兩步。</div>
-        </div>
-
-        <div class="timerBox">
-          <div class="timerBig" id="microTime">01:00</div>
-          <div class="timerSub" id="microHint">準備好了就開始</div>
-
-          <div class="btnRow">
-            <button id="microStart" class="btnPrimary" type="button">開始</button>
-            <button id="microPause" class="btnGhost" type="button">暫停</button>
-            <button id="microReset" class="btnGhost" type="button">重設</button>
-            <button id="microSys" class="btnGhost" type="button">用系統計時器</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- EYE -->
-    <section class="view" id="view-eye">
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">👁️ 護眼｜20-20-20</div>
-          <div class="panelHint">20 分鐘專注 → 看遠 20 呎 → 20 秒。</div>
-        </div>
-
-        <div class="timerBox">
-          <div class="timerBig" id="eyeTime">20:00</div>
-          <div class="timerSub" id="eyePhase">20 分鐘專注中</div>
-
-          <div class="btnRow">
-            <button id="eyeStart" class="btnPrimary" type="button">開始</button>
-            <button id="eyePause" class="btnGhost" type="button">暫停</button>
-            <button id="eyeReset" class="btnGhost" type="button">重設</button>
-            <button id="eyeSysFocus" class="btnGhost" type="button">系統20分鐘</button>
-            <button id="eyeSysRelax" class="btnGhost" type="button">系統20秒</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- POMO -->
-    <section class="view" id="view-pomo">
-      <div class="panel">
-        <div class="panelHead">
-          <div class="panelTitle">🍅 番茄模式</div>
-          <div class="panelHint">預設 25/5（可在 JS 調整）。</div>
-        </div>
-
-        <div class="timerBox">
-          <div class="timerBig" id="pomoTime">25:00</div>
-          <div class="timerSub" id="pomoPhase">專注中</div>
-
-          <div class="btnRow">
-            <button id="pomoStart" class="btnPrimary" type="button">開始</button>
-            <button id="pomoPause" class="btnGhost" type="button">暫停</button>
-            <button id="pomoReset" class="btnGhost" type="button">重設</button>
-            <button id="pomoSys" class="btnGhost" type="button">用系統計時器</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Dialog -->
-  <dialog id="dlg" class="dlg">
-    <div class="dlgTitle" id="dlgTitle">提示</div>
-    <div class="dlgBody" id="dlgBody"></div>
-    <div class="dlgActions">
-      <button id="dlgOk" class="btnPrimary" type="button">確定</button>
-    </div>
-  </dialog>
+<span>作息提醒＋關係滋養</span>
 
 </div>
 
-<!-- JS：放在 body 最底部最穩 -->
-<script src="./app.js"></script>
+</div>
 
-</body>
-  </html>
+<button id="btnInstallHelp" class="btnGhost" type="button">安裝教學</button>
+
+</header>
+
+<!-- Tabs -->
+
+<nav class="tabs" aria-label="主選單">
+
+<button class="tab active" data-view="home" type="button">首頁</button>
+
+<button class="tab" data-view="micro" type="button">微休息</button>
+
+<button class="tab" data-view="eye" type="button">護眼</button>
+
+<button class="tab" data-view="pomo" type="button">蕃茄</button>
+
+</nav>
+
+<!-- Main -->
+
+<main class="main">
+
+<!-- HOME -->
+
+<section class="view active" id="view-home">
+
+<!-- Quick Cards -->
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">
+
+<span class="dotLed"></span>
+
+選一個模式
+
+</div>
+
+<div class="panelHint">點卡片或上方按鈕都可切換。</div>
+
+</div>
+
+<div class="cards">
+
+<button class="card" data-jump="micro" type="button">
+
+<div class="cardTop">
+
+<div class="emoji">⏱️</div>
+
+<div class="cardName">微休息</div>
+
+</div>
+
+<div class="cardDesc">60 秒｜眼睛 or 回身</div>
+
+<div class="cardTag">點我開始</div>
+
+</button>
+
+<button class="card" data-jump="eye" type="button">
+
+<div class="cardTop">
+
+<div class="emoji">👁️</div>
+
+<div class="cardName">護眼</div>
+
+</div>
+
+<div class="cardDesc">20-20-20｜放鬆對焦</div>
+
+<div class="cardTag">點我開始</div>
+
+</button>
+
+<button class="card" data-jump="pomo" type="button">
+
+<div class="cardTop">
+
+<div class="emoji">🍅</div>
+
+<div class="cardName">蕃茄模式</div>
+
+</div>
+
+<div class="cardDesc">專注＋休息｜節奏管理</div>
+
+<div class="cardTag">點我開始</div>
+
+</button>
+
+</div>
+
+<div class="note">
+
+<div class="noteTitle">小提醒</div>
+
+<div class="noteText">
+
+第一次按「開始」可能會觸發瀏覽器允許語音（倒數結束才會播報）。
+
+</div>
+
+</div>
+
+</div>
+
+<!-- Knowledge -->
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">📚 知識區（平日收集）</div>
+
+<div class="panelHint">可新增、刪除、篩選、匯出、清空、永久保存</div>
+
+</div>
+
+<form id="kbForm" class="kbForm" autocomplete="off">
+
+<label class="kbField">
+
+<span class="kbLabel">分類</span>
+
+<select id="kbCat" class="kbInput">
+
+<option value="護眼">護眼</option>
+
+<option value="經絡">經絡</option>
+
+<option value="學習效率">學習效率</option>
+
+<option value="筆記">筆記</option>
+
+</select>
+
+</label>
+
+<label class="kbField kbFieldGrow">
+
+<span class="kbLabel">標題</span>
+
+<input id="kbTitle" class="kbInput" type="text" maxlength="50" placeholder="例如：20-20-20 的重點" />
+
+</label>
+
+<label class="kbField kbFieldGrow">
+
+<span class="kbLabel">內容</span>
+
+<input id="kbText" class="kbInput" type="text" maxlength="160" placeholder="例如：每 20 分鐘看遠 20 呎 20 秒" />
+
+</label>
+
+<button class="btnPrimary" type="submit">新增</button>
+
+</form>
+
+<div class="kbToolbar">
+
+<div class="kbFilter">
+
+<span class="kbFilterLabel">篩選：</span>
+
+<button class="chip active" data-filter="全部" type="button">全部</button>
+
+<button class="chip" data-filter="護眼" type="button">護眼</button>
+
+<button class="chip" data-filter="經絡" type="button">經絡</button>
+
+<button class="chip" data-filter="學習效率" type="button">學習效率</button>
+
+<button class="chip" data-filter="筆記" type="button">筆記</button>
+
+</div>
+
+<div class="kbActions">
+
+<button id="kbExport" class="btnGhost" type="button">匯出</button>
+
+<button id="kbClear" class="btnGhost danger" type="button">清空全部</button>
+
+</div>
+
+</div>
+
+<div id="kbEmpty" class="kbEmpty">尚無資料</div>
+
+<div id="kbList" class="kbList" aria-live="polite"></div>
+
+</div>
+
+<!-- Relationship Nourish -->
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">🌿 關係滋養區</div>
+
+<div class="panelHint">親子／伴侶／人際／自己：每日一句提醒、一次練習、一次靠近</div>
+
+</div>
+
+<form id="relForm" class="relForm" autocomplete="off">
+
+<label class="kbField">
+
+<span class="kbLabel">面向</span>
+
+<select id="relCat" class="kbInput">
+
+<option value="親子">親子</option>
+
+<option value="伴侶">伴侶</option>
+
+<option value="人際">人際</option>
+
+<option value="自己">自己</option>
+
+</select>
+
+</label>
+
+<label class="kbField kbFieldGrow">
+
+<span class="kbLabel">一句話 / 目標</span>
+
+<input id="relTitle" class="kbInput" type="text" maxlength="50" placeholder="例如：先聽完再說、先抱一下" />
+
+</label>
+
+<label class="kbField kbFieldGrow">
+
+<span class="kbLabel">練習 / 行動</span>
+
+<input id="relText" class="kbInput" type="text" maxlength="180" placeholder="例如：今天 3 次『看著眼睛說謝謝』" />
+
+</label>
+
+<label class="kbField">
+
+<span class="kbLabel">頻率</span>
+
+<select id="relFreq" class="kbInput">
+
+<option value="今天">今天</option>
+
+<option value="每天">每天</option>
+
+<option value="每週">每週</option>
+
+</select>
+
+</label>
+
+<button class="btnPrimary" type="submit">新增</button>
+
+</form>
+
+<div class="kbToolbar">
+
+<div class="kbFilter">
+
+<span class="kbFilterLabel">篩選：</span>
+
+<button class="chip2 active" data-relfilter="全部" type="button">全部</button>
+
+<button class="chip2" data-relfilter="親子" type="button">親子</button>
+
+<button class="chip2" data-relfilter="伴侶" type="button">伴侶</button>
+
+<button class="chip2" data-relfilter="人際" type="button">人際</button>
+
+<button class="chip2" data-relfilter="自己" type="button">自己</button>
+
+</div>
+
+<div class="kbActions">
+
+<button id="relExport" class="btnGhost" type="button">匯出</button>
+
+<button id="relClear" class="btnGhost danger" type="button">清空全部</button>
+
+</div>
+
+</div>
+
+<div id="relEmpty" class="kbEmpty">尚無資料</div>
+
+<div id="relList" class="kbList" aria-live="polite"></div>
+
+</div>
+
+<!-- Birthday Reminder -->
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">🎂 生日提醒</div>
+
+<div class="panelHint">到點會跳出提醒＋語音播報（在 app 開著時生效）</div>
+
+</div>
+
+<div id="bdayToday" class="kbEmpty" style="display:none;"></div>
+
+<form id="bdayForm" class="bdayForm" autocomplete="off">
+
+<label class="kbField kbFieldGrow">
+
+<span class="kbLabel">對象</span>
+
+<input id="bdayName" class="kbInput" type="text" maxlength="24" placeholder="例如：媽媽 / 朋友" />
+
+</label>
+
+<label class="kbField">
+
+<span class="kbLabel">日期</span>
+
+<input id="bdayDate" class="kbInput" type="date" />
+
+</label>
+
+<label class="kbField">
+
+<span class="kbLabel">提醒時間</span>
+
+<input id="bdayTime" class="kbInput" type="time" value="09:00" />
+
+</label>
+
+<label class="kbField kbFieldGrow">
+
+<span class="kbLabel">提醒一句話</span>
+
+<input id="bdayMsg" class="kbInput" type="text" maxlength="60" placeholder="例如：記得傳祝福、打電話、準備小卡" />
+
+</label>
+
+<button class="btnPrimary" type="submit">新增</button>
+
+</form>
+
+<div class="kbToolbar">
+
+<div class="kbActions">
+
+<button id="bdayExport" class="btnGhost" type="button">匯出</button>
+
+<button id="bdayClear" class="btnGhost danger" type="button">清空全部</button>
+
+</div>
+
+</div>
+
+<div id="bdayEmpty" class="kbEmpty">尚無資料</div>
+
+<div id="bdayList" class="kbList" aria-live="polite"></div>
+
+</div>
+
+</section>
+
+<!-- MICRO -->
+
+<section class="view" id="view-micro">
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">⏱️ 微休息｜60 秒</div>
+
+<div class="panelHint">眼睛放鬆、肩頸轉動、起身走兩步。</div>
+
+</div>
+
+<div class="timerBox">
+
+<div class="timerBig" id="microTime">01:00</div>
+
+<div class="timerSub" id="microHint">準備好了就開始</div>
+
+<div class="btnRow">
+
+<button id="microStart" class="btnPrimary" type="button">開始</button>
+
+<button id="microPause" class="btnGhost" type="button">暫停</button>
+
+<button id="microReset" class="btnGhost" type="button">重設</button>
+
+<button id="microSys" class="btnGhost" type="button">用系統計時器</button>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<!-- EYE -->
+
+<section class="view" id="view-eye">
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">👁️ 護眼｜20-20-20</div>
+
+<div class="panelHint">20 分鐘專注 → 看遠 20 呎 → 20 秒。</div>
+
+</div>
+
+<div class="timerBox">
+
+<div class="timerBig" id="eyeTime">20:00</div>
+
+<div class="timerSub" id="eyePhase">20 分鐘專注中</div>
+
+<div class="btnRow">
+
+<button id="eyeStart" class="btnPrimary" type="button">開始</button>
+
+<button id="eyePause" class="btnGhost" type="button">暫停</button>
+
+<button id="eyeReset" class="btnGhost" type="button">重設</button>
+
+<button id="eyeSysFocus" class="btnGhost" type="button">系統20分鐘</button>
+
+<button id="eyeSysRelax" class="btnGhost" type="button">系統20秒</button>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<!-- POMO -->
+
+<section class="view" id="view-pomo">
+
+<div class="panel">
+
+<div class="panelHead">
+
+<div class="panelTitle">🍅 蕃茄模式</div>
+
+<div class="panelHint">預設 25/5（可在 JS 調整）。</div>
+
+</div>
+
+<div class="timerBox">
+
+<div class="timerBig" id="pomoTime">25:00</div>
+
+<div class="timerSub" id="pomoPhase">專注中</div>
+
+<div class="btnRow">
+
+<button id="pomoStart" class="btnPrimary" type="button">開始</button>
+
+<button id="pomoPause" class="btnGhost" type="button">暫停</button>
+
+<button id="pomoReset" class="btnGhost" type="button">重設</button>
+
+<button id="pomoSys" class="btnGhost" type="button">用系統計時器</button>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+</main>
+
+<!-- Dialog -->
+
+<dialog id="dlg" class="dlg">
+
+<div class="dlgTitle" id="dlgTitle">提示</div>
+
+<div class="dlgBody" id="dlgBody"></div>
+
+<div class="dlgActions">
+
+<button id="dlgOk" class="btnPrimary" type="button">確定</button>
+
+</div>
+
+</dialog>
+
+</div>
+
+
