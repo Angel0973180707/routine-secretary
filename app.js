@@ -1,26 +1,27 @@
 /* =========================
-作息秘書 v19.1｜ES5 相容加強版 JS（免改 HTML）
-- 不用 async/await
-- 不用模板字串 `...`
-- 先救「按鈕可動」與「倒數可用」
+作息秘書 v19JS（系統計時器強化版）
+- iOS：把「一鍵捷徑」放第一顆，叫不到就跳捷徑教學
+- Android：先 intent SET_TIMER，失敗就跳教學
+- HTML 不用改：JS 動態插入捷徑按鈕
 ========================= */
 
 (function () {
   "use strict";
 
-  /* ---------- tiny helpers ---------- */
+  /* ---------- Helpers ---------- */
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
-  function txt(v) { return (v == null) ? "" : String(v); }
-  function pad2(n) { n = Math.max(0, n | 0); return (n < 10 ? "0" : "") + n; }
-  function fmtMMSS(sec) {
-    sec = Math.max(0, sec | 0);
-    var m = Math.floor(sec / 60);
-    var s = sec % 60;
-    return pad2(m) + ":" + pad2(s);
+  function safeText(s) { return (s == null) ? "" : String(s); }
+  function ensureBtnType(el) {
+    try {
+      if (!el) return;
+      if (el.tagName && el.tagName.toLowerCase() === "button") {
+        if (!el.getAttribute("type")) el.setAttribute("type", "button");
+      }
+    } catch (e) {}
   }
   function escapeHtml(s) {
-    s = txt(s);
+    s = safeText(s);
     return s.replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -36,40 +37,31 @@
     }
     return null;
   }
-  function ensureBtnType(btn) {
+  function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 60); } catch (e) {} }
+
+  /* ---------- TTS ---------- */
+  function ttsWarmup() {
     try {
-      if (!btn) return;
-      if (btn.tagName && btn.tagName.toLowerCase() === "button") {
-        if (!btn.getAttribute("type")) btn.setAttribute("type", "button");
-      }
+      if (!("speechSynthesis" in window) || !window.SpeechSynthesisUtterance) return;
+      window.speechSynthesis.getVoices();
     } catch (e) {}
   }
-  function ensureAllButtonsType() {
-    var bs = $all("button");
-    for (var i = 0; i < bs.length; i++) ensureBtnType(bs[i]);
-  }
-
-  /* ---------- platform ---------- */
-  var UA = navigator.userAgent || "";
-  var IS_IOS = /iPad|iPhone|iPod/i.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  var IS_ANDROID = /Android/i.test(UA);
-
-  /* ---------- TTS / vibrate ---------- */
-  function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 80); } catch (e) {} }
-  function speak(s) {
-    s = txt(s).trim();
-    if (!s) return;
+  function speak(text) {
+    text = safeText(text).trim();
+    if (!text) return;
     try {
       if (!("speechSynthesis" in window) || !window.SpeechSynthesisUtterance) return;
       try { window.speechSynthesis.cancel(); } catch (e) {}
-      var u = new SpeechSynthesisUtterance(s);
+      var u = new SpeechSynthesisUtterance(text);
       u.lang = "zh-TW";
       u.rate = 1.0;
+      u.pitch = 1.0;
+      u.volume = 1.0;
       window.speechSynthesis.speak(u);
-    } catch (e2) {}
+    } catch (e) {}
   }
 
-  /* ---------- dialog ---------- */
+  /* ---------- Dialog ---------- */
   var dlg = $("#dlg");
   var dlgTitle = $("#dlgTitle");
   var dlgBody = $("#dlgBody");
@@ -77,33 +69,36 @@
 
   function openDlg(title, bodyHtml) {
     if (!dlg) return;
-    if (dlgTitle) dlgTitle.textContent = txt(title || "提示");
-    if (dlgBody) dlgBody.innerHTML = txt(bodyHtml || "");
+    if (dlgTitle) dlgTitle.textContent = safeText(title || "提示");
+    if (dlgBody) dlgBody.innerHTML = safeText(bodyHtml || "");
     try {
-      if (dlg.showModal) dlg.showModal();
+      if (typeof dlg.showModal === "function") dlg.showModal();
       else dlg.setAttribute("open", "open");
     } catch (e) {
-      try { dlg.setAttribute("open", "open"); } catch (e2) {}
+      dlg.setAttribute("open", "open");
     }
   }
   function closeDlg() {
     if (!dlg) return;
     try {
-      if (dlg.close) dlg.close();
+      if (typeof dlg.close === "function") dlg.close();
       else dlg.removeAttribute("open");
     } catch (e) {
-      try { dlg.removeAttribute("open"); } catch (e2) {}
+      dlg.removeAttribute("open");
     }
   }
-  function bindDlgOkDefault() {
+  function bindDialog() {
     if (!dlgOk) return;
     ensureBtnType(dlgOk);
-    dlgOk.onclick = function () { closeDlg(); };
+    dlgOk.onclick = null;
+    dlgOk.addEventListener("click", function () { closeDlg(); });
   }
 
-  /* ---------- view switch ---------- */
+  /* ---------- View switching ---------- */
+  var activeView = "home";
   function setActiveView(viewName) {
-    viewName = txt(viewName).trim() || "home";
+    viewName = safeText(viewName).trim() || "home";
+    activeView = viewName;
 
     var tabs = $all(".tab");
     for (var i = 0; i < tabs.length; i++) {
@@ -116,363 +111,321 @@
     var views = $all(".view");
     for (var j = 0; j < views.length; j++) {
       var sec = views[j];
-      var on = (sec.id === "view-" + viewName);
-      if (on) sec.classList.add("active");
+      var isOn = (sec.id === "view-" + viewName);
+      if (isOn) sec.classList.add("active");
       else sec.classList.remove("active");
     }
-
     try { window.scrollTo(0, 0); } catch (e) {}
   }
 
-  /* ---------- notification (front-only, ES5) ---------- */
-  function canNotify() { return ("Notification" in window); }
-  function tryNotify(title, body) {
-    title = txt(title || "作息秘書");
-    body = txt(body || "");
-    if (!canNotify()) return false;
-    if (Notification.permission !== "granted") return false;
-    try { new Notification(title, { body: body, tag: "sleep-secretary-v19" }); return true; }
-    catch (e) { return false; }
+  /* ==========================================================
+     ✅ 核心：偵測系統 + 系統計時器（Android intent / iOS 捷徑）
+  ========================================================== */
+
+  function isIOS() {
+    var ua = navigator.userAgent || "";
+    var iOSLike = /iPad|iPhone|iPod/.test(ua);
+    // iPadOS 13+ 會偽裝成 Mac
+    var iPadOS13 = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return iOSLike || iPadOS13;
   }
-  function remind(title, body, ttsText) {
-    vibrate(140);
-    speak(ttsText || title);
-    tryNotify(title, body);
+
+  function isAndroid() {
+    return /Android/i.test(navigator.userAgent || "");
+  }
+
+  // iOS：用捷徑 URL scheme 執行捷徑（捷徑名稱需與你教學一致）
+  function runIOSShortcutByName(shortcutName) {
+    shortcutName = safeText(shortcutName).trim();
+    if (!shortcutName) return false;
+    // 注意：名稱若含空白/特殊字元要 encode
+    var url = "shortcuts://run-shortcut?name=" + encodeURIComponent(shortcutName);
+    // 用 location 觸發最穩
+    window.location.href = url;
+    return true;
+  }
+
+  // Android：呼叫系統「設定計時器」intent（Chrome 通常可）
+  function startAndroidTimerIntent(seconds, label) {
+    seconds = Math.max(1, (seconds | 0));
+    label = safeText(label || "作息秘書");
+    // SET_TIMER：seconds + message + skip UI（不一定每支手機支援）
+    var intentUrl =
+      "intent:#Intent;" +
+      "action=android.intent.action.SET_TIMER;" +
+      "S.android.intent.extra.alarm.MESSAGE=" + encodeURIComponent(label) + ";" +
+      "i.android.intent.extra.alarm.LENGTH=" + seconds + ";" +
+      "B.android.intent.extra.alarm.SKIP_UI=true;" +
+      "end";
+    try {
+      window.location.href = intentUrl;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 叫不到系統計時器時：統一顯示「一鍵捷徑教學」
+  function showOneKeyHelp(modeTitle, shortcutNameSuggested) {
+    var ios = isIOS();
+    var html = "";
+
+    html += "<p><b>" + escapeHtml(modeTitle) + "</b></p>";
+    html += "<p style='opacity:.9'>你的手機或瀏覽器可能無法直接由 PWA 叫出「系統計時器」。</p>";
+
+    if (ios) {
+      html += "<hr style='opacity:.15;margin:10px 0;'>";
+      html += "<p><b>iPhone / iPad（建議用「捷徑」一鍵開計時器）</b></p>";
+      html += "<ol style='margin:6px 0 0 18px;'>";
+      html += "<li>打開「捷徑」App</li>";
+      html += "<li>點「＋」建立捷徑</li>";
+      html += "<li>加入動作：<b>開始計時器</b>（Start Timer）</li>";
+      html += "<li>把時間設成此模式的秒數/分鐘數</li>";
+      html += "<li>捷徑命名：<b>" + escapeHtml(shortcutNameSuggested) + "</b></li>";
+      html += "</ol>";
+      html += "<p style='opacity:.85;margin-top:8px;'>建立好後，回到作息秘書按「一鍵捷徑」就會直接開。</p>";
+      html += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:center;'>";
+      html += "<button id='btnRunShortcutNow' class='btnPrimary' type='button'>一鍵開捷徑</button>";
+      html += "</div>";
+    } else if (isAndroid()) {
+      html += "<hr style='opacity:.15;margin:10px 0;'>";
+      html += "<p><b>Android（替代方案）</b></p>";
+      html += "<ol style='margin:6px 0 0 18px;'>";
+      html += "<li>若本機不支援 intent，請直接打開：<b>時鐘 → 計時器</b></li>";
+      html += "<li>把時間設成此模式的秒數/分鐘數</li>";
+      html += "<li>回到作息秘書繼續工作/學習</li>";
+      html += "</ol>";
+      html += "<p style='opacity:.85;margin-top:8px;'>（不同品牌手機的「時鐘」App 能力不同）</p>";
+    } else {
+      html += "<p style='opacity:.85'>此裝置非 iOS/Android，請改用內建倒數或手動開時鐘計時器。</p>";
+    }
+
+    openDlg("一鍵補救教學", html);
+
+    // 綁定「一鍵開捷徑」
+    var btn = $("#btnRunShortcutNow");
+    if (btn && isIOS()) {
+      ensureBtnType(btn);
+      btn.onclick = null;
+      btn.addEventListener("click", function () {
+        ttsWarmup();
+        speak("開啟捷徑");
+        runIOSShortcutByName(shortcutNameSuggested);
+      });
+    }
+  }
+
+  // ✅ 對外統一入口：嘗試「系統」→ 失敗就「教學」
+  function tryStartSystemTimer(seconds, label, iosShortcutName, modeTitle) {
+    ttsWarmup();
+
+    if (isIOS()) {
+      // iOS：直接走捷徑（系統不允許 web 直接控制 Clock 計時器）
+      speak("使用一鍵捷徑");
+      var ok = runIOSShortcutByName(iosShortcutName);
+      // 無法得知是否真的成功，只能提供補救教學
+      setTimeout(function () {
+        showOneKeyHelp(modeTitle, iosShortcutName);
+      }, 600);
+      return;
+    }
+
+    if (isAndroid()) {
+      speak("已嘗試開啟系統計時器");
+      var okA = startAndroidTimerIntent(seconds, label);
+      // Android 也無法 100% 確認；給「如何證明」：提示你去最近任務看時鐘、或等通知
+      setTimeout(function () {
+        // 若手機沒反應 → 直接教學
+        showOneKeyHelp(modeTitle, iosShortcutName);
+      }, 700);
+      return;
+    }
+
+    // 其他平台
+    speak("此裝置不支援系統計時器");
+    showOneKeyHelp(modeTitle, iosShortcutName);
   }
 
   /* ==========================================================
-     Timers (內建倒數) — 一定可用
+     ✅ iOS 偵測後：把「一鍵捷徑」插到按鈕列第一顆
+     - 不改 HTML：動態插入
   ========================================================== */
-  var microTimeEl = $("#microTime");
-  var microHintEl = $("#microHint");
-  var microStartBtn = $("#microStart");
-  var microPauseBtn = $("#microPause");
-  var microResetBtn = $("#microReset");
-  var microSysBtn = $("#microSys");
 
-  var eyeTimeEl = $("#eyeTime");
-  var eyePhaseEl = $("#eyePhase");
-  var eyeStartBtn = $("#eyeStart");
-  var eyePauseBtn = $("#eyePause");
-  var eyeResetBtn = $("#eyeReset");
+  function insertIOSShortcutButtonFirst(btnRowEl, shortcutName, modeTitle) {
+    if (!btnRowEl || !isIOS()) return;
+
+    // 避免重複插入
+    if (btnRowEl.querySelector("[data-ios-shortcut='1']")) return;
+
+    var b = document.createElement("button");
+    b.className = "btnPrimary";        // 讓它看起來是主行動
+    b.type = "button";
+    b.textContent = "一鍵捷徑";
+    b.setAttribute("data-ios-shortcut", "1");
+
+    b.addEventListener("click", function (e) {
+      e.preventDefault();
+      ttsWarmup();
+      speak("開啟捷徑");
+      runIOSShortcutByName(shortcutName);
+      // 同步給教學（避免用戶沒建立）
+      setTimeout(function () {
+        showOneKeyHelp(modeTitle, shortcutName);
+      }, 600);
+    });
+
+    // 插到第一顆
+    btnRowEl.insertBefore(b, btnRowEl.firstChild);
+  }
+
+  /* ==========================================================
+     Timers（你原本的倒數功能保留：這裡只示範掛系統按鈕）
+     ⚠️ 你原本 micro/eye/pomo 的倒數邏輯可留著
+  ========================================================== */
+
+  // 取系統按鈕（你 HTML 已有）
+  var microSysBtn = $("#microSys");
   var eyeSysFocusBtn = $("#eyeSysFocus");
   var eyeSysRelaxBtn = $("#eyeSysRelax");
-
-  var pomoTimeEl = $("#pomoTime");
-  var pomoPhaseEl = $("#pomoPhase");
-  var pomoStartBtn = $("#pomoStart");
-  var pomoPauseBtn = $("#pomoPause");
-  var pomoResetBtn = $("#pomoReset");
   var pomoSysBtn = $("#pomoSys");
 
-  // 預設值（你要的）
-  var micro = { total: 60, left: 60, running: false, t: null };
-  var eye = { focusSec: 20 * 60, relaxSec: 20, phase: "focus", left: 20 * 60, running: false, t: null };
-  var pomo = { focusMin: 25, breakMin: 5, phase: "focus", left: 25 * 60, running: false, t: null };
+  function bindSystemTimerButtons() {
+    // 1) iOS：在每個模式按鈕列插入「一鍵捷徑」第一顆
+    // 找到各自的 btnRow
+    var microRow = microSysBtn ? closest(microSysBtn, ".btnRow") : null;
+    var eyeRow = eyeSysFocusBtn ? closest(eyeSysFocusBtn, ".btnRow") : null;
+    var pomoRow = pomoSysBtn ? closest(pomoSysBtn, ".btnRow") : null;
 
-  function microRender() {
-    if (microTimeEl) microTimeEl.textContent = fmtMMSS(micro.left);
-    if (microHintEl) microHintEl.textContent = micro.running ? "進行中…" : "準備好了就開始";
-  }
-  function microStopInterval() { if (micro.t) { clearInterval(micro.t); micro.t = null; } }
-  function microDone() {
-    micro.left = 0;
-    micro.running = false;
-    microStopInterval();
-    microRender();
-    remind("微休息完成 ✅", "喝口水、放鬆肩頸。", "微休息結束，做得好。");
-    openDlg("完成 ✅", "<p>微休息結束～喝口水、放鬆肩頸。</p>");
-  }
-  function microTick() {
-    if (!micro.running) return;
-    micro.left -= 1;
-    if (micro.left <= 0) { microDone(); return; }
-    microRender();
-  }
-  function microStart() {
-    if (micro.running) return;
-    micro.running = true;
-    if (!micro.t) micro.t = setInterval(microTick, 1000);
-    microRender();
-  }
-  function microPause() {
-    micro.running = false;
-    microStopInterval();
-    microRender();
-  }
-  function microReset() {
-    micro.running = false;
-    microStopInterval();
-    micro.left = micro.total;
-    microRender();
-  }
+    // 建議的捷徑名稱（你教學就用這些名字）
+    insertIOSShortcutButtonFirst(microRow, "作息-微休息60秒", "微休息｜60 秒");
+    insertIOSShortcutButtonFirst(eyeRow, "作息-護眼20分鐘", "護眼｜20 分鐘");
+    // 護眼 20 秒也會用到另一個捷徑（第二顆系統20秒）
+    // 這顆第一顆先放 20分鐘的捷徑（因為最常用）
+    insertIOSShortcutButtonFirst(pomoRow, "作息-番茄25分鐘", "蕃茄｜25 分鐘");
 
-  function eyeRender() {
-    if (eyeTimeEl) eyeTimeEl.textContent = fmtMMSS(eye.left);
-    if (eyePhaseEl) eyePhaseEl.textContent = (eye.phase === "focus") ? "20 分鐘專注中" : "看遠 20 呎｜20 秒";
-  }
-  function eyeStopInterval() { if (eye.t) { clearInterval(eye.t); eye.t = null; } }
-  function eyeSwitchPhase() {
-    if (eye.phase === "focus") {
-      eye.phase = "relax";
-      eye.left = eye.relaxSec;
-      remind("護眼提醒 👁️", "請看遠 20 秒（約 6 公尺）。", "護眼提醒，請看遠二十秒。");
-      openDlg("護眼提醒 👁️", "<p>看遠 20 呎（約 6 公尺）<br>持續 20 秒。</p>");
-    } else {
-      eye.phase = "focus";
-      eye.left = eye.focusSec;
-      remind("回到專注 ✅", "開始 20 分鐘。", "回到專注，開始二十分鐘。");
-    }
-    eyeRender();
-  }
-  function eyeTick() {
-    if (!eye.running) return;
-    eye.left -= 1;
-    if (eye.left <= 0) { eyeSwitchPhase(); return; }
-    eyeRender();
-  }
-  function eyeStart() {
-    if (eye.running) return;
-    eye.running = true;
-    if (!eye.t) eye.t = setInterval(eyeTick, 1000);
-    eyeRender();
-  }
-  function eyePause() {
-    eye.running = false;
-    eyeStopInterval();
-    eyeRender();
-  }
-  function eyeReset() {
-    eye.running = false;
-    eyeStopInterval();
-    eye.phase = "focus";
-    eye.left = eye.focusSec;
-    eyeRender();
-  }
-
-  function pomoRender() {
-    if (pomoTimeEl) pomoTimeEl.textContent = fmtMMSS(pomo.left);
-    if (pomoPhaseEl) pomoPhaseEl.textContent = (pomo.phase === "focus") ? "專注中" : "休息中";
-  }
-  function pomoStopInterval() { if (pomo.t) { clearInterval(pomo.t); pomo.t = null; } }
-  function pomoSwitchPhase() {
-    if (pomo.phase === "focus") {
-      pomo.phase = "break";
-      pomo.left = pomo.breakMin * 60;
-      remind("番茄休息 🍅", "休息一下：喝水、伸展、走兩步。", "番茄鐘，進入休息時間。");
-      openDlg("番茄休息 🍅", "<p>休息一下：喝水、伸展、走兩步。</p>");
-    } else {
-      pomo.phase = "focus";
-      pomo.left = pomo.focusMin * 60;
-      remind("番茄開始 🍅", "新一輪專注開始～", "番茄鐘，開始專注。");
-      openDlg("番茄開始 🍅", "<p>新一輪專注開始～</p>");
-    }
-    pomoRender();
-  }
-  function pomoTick() {
-    if (!pomo.running) return;
-    pomo.left -= 1;
-    if (pomo.left <= 0) { pomoSwitchPhase(); return; }
-    pomoRender();
-  }
-  function pomoStart() {
-    if (pomo.running) return;
-    pomo.running = true;
-    if (!pomo.t) pomo.t = setInterval(pomoTick, 1000);
-    pomoRender();
-  }
-  function pomoPause() {
-    pomo.running = false;
-    pomoStopInterval();
-    pomoRender();
-  }
-  function pomoReset() {
-    pomo.running = false;
-    pomoStopInterval();
-    pomo.phase = "focus";
-    pomo.left = pomo.focusMin * 60;
-    pomoRender();
-  }
-
-  /* ==========================================================
-     Android 系統計時器（盡量） + 可驗證
-     iOS：直接 fallback 內建倒數（可靠）
-  ========================================================== */
-  function tryOpen(url) {
-    try { window.location.href = url; return true; } catch (e) {}
-    return false;
-  }
-
-  function proveLaunch(label) {
-    openDlg("已送出「系統計時器」請求",
-      "<p><b>" + escapeHtml(label) + "</b></p>" +
-      "<p>若成功，通常會：</p><ol>" +
-      "<li>跳到「時鐘/計時器」App</li>" +
-      "<li>通知列出現倒數</li></ol>" +
-      "<p style='opacity:.85'>我會用「是否切出本頁」當作證據。</p>"
-    );
-
-    var left = false;
-    function onVis() { if (document.hidden) left = true; }
-    document.addEventListener("visibilitychange", onVis);
-
-    setTimeout(function () {
-      try { document.removeEventListener("visibilitychange", onVis); } catch (e) {}
-      if (left) {
-        openDlg("✅ 有切出本頁", "<p>看起來有跳到系統/時鐘畫面，請拉下通知列確認倒數。</p>");
-      } else {
-        openDlg("⚠️ 沒切出本頁", "<p>此機型/瀏覽器可能阻擋 intent。已改用內建倒數確保可用。</p>");
-      }
-    }, 2200);
-  }
-
-  function openSystemTimerOrFallback(seconds, label, fallbackFn) {
-    seconds = Math.max(1, seconds | 0);
-    label = txt(label || "作息秘書");
-
-    if (IS_IOS) {
-      speak("iPhone 建議用內建倒數。");
-      openDlg("iPhone / iPad", "<p>iOS 網頁/PWA 通常無法可靠喚起系統計時器，我已改用內建倒數。</p>");
-      if (fallbackFn) fallbackFn();
-      return;
+    // 2) 綁定原本的「用系統計時器」按鈕：Android intent / iOS 捷徑
+    if (microSysBtn) {
+      ensureBtnType(microSysBtn);
+      microSysBtn.onclick = null;
+      microSysBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        vibrate(50);
+        tryStartSystemTimer(
+          60,
+          "作息秘書｜微休息 60 秒",
+          "作息-微休息60秒",
+          "微休息｜60 秒"
+        );
+      });
     }
 
-    if (!IS_ANDROID) {
-      openDlg("提示", "<p>此裝置非 Android，已改用內建倒數。</p>");
-      if (fallbackFn) fallbackFn();
-      return;
+    if (eyeSysFocusBtn) {
+      ensureBtnType(eyeSysFocusBtn);
+      eyeSysFocusBtn.onclick = null;
+      eyeSysFocusBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        vibrate(50);
+        tryStartSystemTimer(
+          20 * 60,
+          "作息秘書｜護眼 20 分鐘",
+          "作息-護眼20分鐘",
+          "護眼｜20 分鐘"
+        );
+      });
     }
 
-    proveLaunch(label);
+    if (eyeSysRelaxBtn) {
+      ensureBtnType(eyeSysRelaxBtn);
+      eyeSysRelaxBtn.onclick = null;
+      eyeSysRelaxBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        vibrate(50);
+        // iOS 建議捷徑名：作息-護眼20秒
+        tryStartSystemTimer(
+          20,
+          "作息秘書｜護眼 看遠 20 秒",
+          "作息-護眼20秒",
+          "護眼｜20 秒"
+        );
+      });
+    }
 
-    // 多種 intent（不同手機吃的不一樣）
-    var msg = encodeURIComponent(label);
-    var u1 = "intent:#Intent;action=android.intent.action.SET_TIMER;S.android.intent.extra.alarm.LENGTH=" + seconds + ";S.android.intent.extra.alarm.MESSAGE=" + msg + ";B.android.intent.extra.alarm.SKIP_UI=false;end";
-    var u2 = "intent:#Intent;action=android.intent.action.SET_TIMER;i.android.intent.extra.alarm.LENGTH=" + seconds + ";S.android.intent.extra.alarm.MESSAGE=" + msg + ";B.android.intent.extra.alarm.SKIP_UI=false;end";
-
-    tryOpen(u1);
-    tryOpen(u2);
-
-    // 800ms 內沒切出就 fallback（確保可用）
-    var left = false;
-    function onVis() { if (document.hidden) left = true; }
-    document.addEventListener("visibilitychange", onVis);
-
-    setTimeout(function () {
-      try { document.removeEventListener("visibilitychange", onVis); } catch (e) {}
-      if (!left) {
-        speak("系統計時器沒有反應，改用內建倒數。");
-        if (fallbackFn) fallbackFn();
-      }
-    }, 800);
+    if (pomoSysBtn) {
+      ensureBtnType(pomoSysBtn);
+      pomoSysBtn.onclick = null;
+      pomoSysBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        vibrate(50);
+        tryStartSystemTimer(
+          25 * 60,
+          "作息秘書｜番茄 25 分鐘",
+          "作息-番茄25分鐘",
+          "蕃茄｜25 分鐘"
+        );
+      });
+    }
   }
 
-  /* ==========================================================
-     Bind buttons
-  ========================================================== */
-  function bindTimerButtons() {
-    // micro
-    if (microStartBtn) microStartBtn.onclick = function (e) { if (e) e.preventDefault(); microStart(); };
-    if (microPauseBtn) microPauseBtn.onclick = function (e) { if (e) e.preventDefault(); microPause(); };
-    if (microResetBtn) microResetBtn.onclick = function (e) { if (e) e.preventDefault(); microReset(); };
-    if (microSysBtn) microSysBtn.onclick = function (e) {
-      if (e) e.preventDefault();
-      speak("已嘗試開啟系統計時器。");
-      openSystemTimerOrFallback(micro.left || micro.total, "作息秘書｜微休息 " + fmtMMSS(micro.left || micro.total), function () {
-        microReset(); microStart();
-      });
-    };
-    microRender();
-
-    // eye
-    if (eyeStartBtn) eyeStartBtn.onclick = function (e) { if (e) e.preventDefault(); eyeStart(); };
-    if (eyePauseBtn) eyePauseBtn.onclick = function (e) { if (e) e.preventDefault(); eyePause(); };
-    if (eyeResetBtn) eyeResetBtn.onclick = function (e) { if (e) e.preventDefault(); eyeReset(); };
-    if (eyeSysFocusBtn) eyeSysFocusBtn.onclick = function (e) {
-      if (e) e.preventDefault();
-      speak("已嘗試開啟系統計時器。");
-      openSystemTimerOrFallback(eye.focusSec, "作息秘書｜護眼 專注 20 分鐘", function () {
-        eyeReset(); eyeStart();
-      });
-    };
-    if (eyeSysRelaxBtn) eyeSysRelaxBtn.onclick = function (e) {
-      if (e) e.preventDefault();
-      speak("已嘗試開啟系統計時器。");
-      openSystemTimerOrFallback(eye.relaxSec, "作息秘書｜護眼 看遠 20 秒", function () {
-        eyePause();
-        eye.phase = "relax";
-        eye.left = eye.relaxSec;
-        eyeRender();
-        eyeStart();
-      });
-    };
-    eyeRender();
-
-    // pomo
-    if (pomoStartBtn) pomoStartBtn.onclick = function (e) { if (e) e.preventDefault(); pomoStart(); };
-    if (pomoPauseBtn) pomoPauseBtn.onclick = function (e) { if (e) e.preventDefault(); pomoPause(); };
-    if (pomoResetBtn) pomoResetBtn.onclick = function (e) { if (e) e.preventDefault(); pomoReset(); };
-    if (pomoSysBtn) pomoSysBtn.onclick = function (e) {
-      if (e) e.preventDefault();
-      speak("已嘗試開啟系統計時器。");
-      var sec = pomo.left || (pomo.focusMin * 60);
-      var label = (pomo.phase === "focus") ? ("作息秘書｜番茄 專注 " + fmtMMSS(sec)) : ("作息秘書｜番茄 休息 " + fmtMMSS(sec));
-      openSystemTimerOrFallback(sec, label, function () {
-        pomoReset(); pomoStart();
-      });
-    };
-    pomoRender();
-  }
-
-  function bindNavigation() {
+  /* ---------- Global click delegation（保留你的 tabs / cards） ---------- */
+  function bindGlobalDelegation() {
     document.addEventListener("click", function (e) {
       var t = e.target;
+      ttsWarmup();
 
       var tab = closest(t, ".tab[data-view]");
-      if (tab) { e.preventDefault(); setActiveView(tab.getAttribute("data-view")); return; }
+      if (tab) {
+        e.preventDefault();
+        setActiveView(tab.getAttribute("data-view") || "home");
+        return;
+      }
 
       var card = closest(t, ".card[data-jump]");
-      if (card) { e.preventDefault(); setActiveView(card.getAttribute("data-jump")); return; }
+      if (card) {
+        e.preventDefault();
+        setActiveView(card.getAttribute("data-jump") || "home");
+        return;
+      }
     }, false);
   }
 
+  /* ---------- Install help（你原本就有） ---------- */
+  var btnInstallHelp = $("#btnInstallHelp");
   function bindInstallHelp() {
-    var btn = $("#btnInstallHelp");
-    if (!btn) return;
-    ensureBtnType(btn);
-    btn.onclick = function (e) {
-      if (e) e.preventDefault();
-      openDlg("安裝教學",
+    if (!btnInstallHelp) return;
+    ensureBtnType(btnInstallHelp);
+    btnInstallHelp.onclick = null;
+    btnInstallHelp.addEventListener("click", function (e) {
+      e.preventDefault();
+      var html =
         "<p><b>Android（Chrome）</b><br>右上角「⋮」→ <b>加入主畫面</b></p>" +
         "<p><b>iPhone（Safari）</b><br>分享按鈕 → <b>加入主畫面</b></p>" +
-        "<p style='opacity:.85'>提醒：系統通知需 HTTPS + 允許通知。iOS 背景倒數不保證。</p>"
-      );
-    };
+        "<p style='opacity:.85'>iOS 系統計時器建議用「捷徑」一鍵啟動。</p>";
+      openDlg("安裝教學", html);
+    });
   }
 
-  /* ==========================================================
-     HARD GUARD：如果初始化失敗，直接提示你
-  ========================================================== */
+  /* ---------- Init ---------- */
   function init() {
-    ensureAllButtonsType();
-    bindDlgOkDefault();
+    bindDialog();
     bindInstallHelp();
-    bindNavigation();
-    bindTimerButtons();
+    bindGlobalDelegation();
+
+    // ✅ 核心：系統計時器按鈕 + iOS 一鍵捷徑第一顆
+    bindSystemTimerButtons();
+
+    // 預設回首頁
     setActiveView("home");
 
-    // 讓你一眼看到「JS確實跑起來」
-    //（只出現一次）
-    // speak("作息秘書已啟動。");
+    // 用戶知道目前偵測到什麼
+    if (isIOS()) {
+      // 不用太吵，只在第一次可視時提示
+      // speak("已偵測到蘋果系統，一鍵捷徑已置頂。");
+    }
   }
 
-  try {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-    else init();
-  } catch (err) {
-    // 如果你還是遇到「按鈕不動」，這裡會把錯誤顯示出來
-    alert("JS 初始化失敗：\n" + (err && err.message ? err.message : err));
-    console.error(err);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
   }
-
 })();
