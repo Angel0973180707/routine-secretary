@@ -1,10 +1,11 @@
 /* =========================
-作息秘書 v19（完整 JS｜可直接覆蓋）
-- 承接 v17：Tabs / Cards / 三種計時器 / Dialog / KB / REL / 生日提醒
-- v19 強化：系統計時器「補救方案」
-  1) iOS 偵測：每個模式按鈕列插入「一鍵捷徑」第一顆
-  2) Android：嘗試 intent SET_TIMER；不行就跳教學
-  3) 叫不到系統：統一跳「一鍵捷徑教學（iOS/Android）」Dialog
+作息秘書 v19.1（完整 JS｜可直接覆蓋）
+
+- 承接 v19：Tabs / Cards / 三種計時器 / Dialog / KB / REL / 生日提醒
+- v19.1 更新：
+  1) 「經絡」統一改名為「筋絡」（包含：下拉選單、篩選 chip、既有資料顯示）
+  2) 知識區分類新增：運動 / 其他 / 備忘
+  3) 若頁面上缺少新分類 chip，會嘗試自動補上（找得到 chip 容器才會加）
 ========================= */
 
 (function () {
@@ -135,7 +136,7 @@
   }
 
   /* ==========================================================
-     v19：系統計時器補救（iOS 捷徑 / Android intent）
+  v19：系統計時器補救（iOS 捷徑 / Android intent）
   ========================================================== */
   function isIOS() {
     var ua = navigator.userAgent || "";
@@ -143,9 +144,7 @@
     var iPadOS13 = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     return iOSLike || iPadOS13;
   }
-  function isAndroid() {
-    return /Android/i.test(navigator.userAgent || "");
-  }
+  function isAndroid() { return /Android/i.test(navigator.userAgent || ""); }
 
   function runIOSShortcutByName(shortcutName) {
     shortcutName = safeText(shortcutName).trim();
@@ -171,7 +170,6 @@
   function showOneKeyHelp(modeTitle, shortcutNameSuggested) {
     var ios = isIOS();
     var html = "";
-
     html += "<p><b>" + escapeHtml(modeTitle) + "</b></p>";
     html += "<p style='opacity:.9'>部分手機/瀏覽器/PWA 無法由網頁直接控制「系統計時器」。我們用最穩的替代方案。</p>";
 
@@ -218,7 +216,6 @@
 
   function tryStartSystemTimer(seconds, label, iosShortcutName, modeTitle) {
     ttsWarmup();
-
     if (isIOS()) {
       vibrate(50);
       speak("使用一鍵捷徑");
@@ -226,7 +223,6 @@
       setTimeout(function () { showOneKeyHelp(modeTitle, iosShortcutName); }, 650);
       return;
     }
-
     if (isAndroid()) {
       vibrate(50);
       speak("已嘗試開啟系統計時器");
@@ -234,7 +230,6 @@
       setTimeout(function () { showOneKeyHelp(modeTitle, iosShortcutName); }, 750);
       return;
     }
-
     speak("此裝置不支援系統計時器");
     showOneKeyHelp(modeTitle, iosShortcutName);
   }
@@ -248,7 +243,6 @@
     b.type = "button";
     b.textContent = "一鍵捷徑";
     b.setAttribute("data-ios-shortcut", "1");
-
     b.addEventListener("click", function (e) {
       e.preventDefault();
       ttsWarmup();
@@ -261,14 +255,8 @@
   }
 
   /* ==========================================================
-     Timers（三個倒數：微休息 / 護眼 / 蕃茄）
-     ✅ 可調預設值：你要的三點
-       1) 微休息預設 60 秒（可調）
-       2) 護眼 20 分 20 秒
-       3) 蕃茄預設 25/5（可調）
+  Timers（三個倒數：微休息 / 護眼 / 蕃茄）
   ========================================================== */
-
-  // 可調預設（之後你要做 UI 可再加）
   var DEFAULTS = {
     microSec: 60,
     eyeFocusMin: 20,
@@ -303,11 +291,8 @@
     vibrate(120);
     ttsWarmup();
     speak(ttsText || title);
-
-    // 系統通知（若你未開權限，至少有 Dialog + 語音）
     try {
       if ("Notification" in window && Notification.permission === "granted") {
-        // 前景通知
         try { new Notification(title, { body: body, tag: "sleep-secretary" }); } catch (e) {}
       }
     } catch (e2) {}
@@ -464,8 +449,8 @@
   }
 
   /* ==========================================================
-     系統計時器按鈕（你 HTML 已有 id）
-     microSys / eyeSysFocus / eyeSysRelax / pomoSys
+  系統計時器按鈕（你 HTML 已有 id）
+  microSys / eyeSysFocus / eyeSysRelax / pomoSys
   ========================================================== */
   var microSysBtn = $("#microSys");
   var eyeSysFocusBtn = $("#eyeSysFocus");
@@ -477,7 +462,6 @@
     var eyeRow = eyeSysFocusBtn ? closest(eyeSysFocusBtn, ".btnRow") : null;
     var pomoRow = pomoSysBtn ? closest(pomoSysBtn, ".btnRow") : null;
 
-    // ✅ iOS：插入第一顆「一鍵捷徑」
     insertIOSShortcutButtonFirst(microRow, "作息-微休息60秒", "微休息｜60 秒");
     insertIOSShortcutButtonFirst(eyeRow, "作息-護眼20分鐘", "護眼｜20 分鐘");
     insertIOSShortcutButtonFirst(pomoRow, "作息-番茄25分鐘", "蕃茄｜25 分鐘");
@@ -536,11 +520,97 @@
   }
 
   /* ==========================================================
-     Storage keys + KB / REL / BDAY（維持 v17 功能）
+  Storage keys + KB / REL / BDAY
   ========================================================== */
-  var KB_KEY = "sleepSecretary_v19_kb";
-  var REL_KEY = "sleepSecretary_v19_rel";
-  var BDAY_KEY = "sleepSecretary_v19_bday";
+  var KB_KEY = "sleepSecretary_v19_1_kb";
+  var REL_KEY = "sleepSecretary_v19_1_rel";
+  var BDAY_KEY = "sleepSecretary_v19_1_bday";
+
+  /* ==========================================================
+  v19.1：知識區分類修正/新增（經絡→筋絡 + 運動/其他/備忘）
+  ========================================================== */
+  var KB_CAT_LEGACY = "經絡";
+  var KB_CAT_NEW = "筋絡";
+  var KB_CATS = ["護眼", "筋絡", "運動", "學習效率", "其他", "備忘", "筆記"];
+
+  function normalizeKBCategory(cat) {
+    cat = safeText(cat).trim();
+    if (!cat) return "筆記";
+    if (cat === KB_CAT_LEGACY) return KB_CAT_NEW;
+    return cat;
+  }
+
+  function ensureSelectOption(selectEl, valueText) {
+    if (!selectEl) return;
+    valueText = safeText(valueText).trim();
+    if (!valueText) return;
+    var opts = selectEl.options;
+    for (var i = 0; i < opts.length; i++) {
+      if (safeText(opts[i].value) === valueText || safeText(opts[i].text) === valueText) return;
+    }
+    var o = document.createElement("option");
+    o.value = valueText;
+    o.textContent = valueText;
+    selectEl.appendChild(o);
+  }
+
+  function renameSelectOption(selectEl, fromText, toText) {
+    if (!selectEl) return;
+    var opts = selectEl.options;
+    for (var i = 0; i < opts.length; i++) {
+      var v = safeText(opts[i].value);
+      var t = safeText(opts[i].text);
+      if (v === fromText || t === fromText) {
+        opts[i].value = toText;
+        opts[i].textContent = toText;
+      }
+    }
+  }
+
+  function renameKBChipsInDOM() {
+    var chips = $all(".chip[data-filter]");
+    for (var i = 0; i < chips.length; i++) {
+      var c = chips[i];
+      var f = c.getAttribute("data-filter") || "";
+      if (f === KB_CAT_LEGACY) c.setAttribute("data-filter", KB_CAT_NEW);
+      // 文字也一起改（避免看起來還是舊的）
+      if (safeText(c.textContent).trim() === KB_CAT_LEGACY) c.textContent = KB_CAT_NEW;
+    }
+  }
+
+  function ensureKBChipsExist() {
+    // 找 KB 的 chip 容器：以「任一 chip 的父層」為候選，若找不到就不硬加（避免插錯地方）
+    var anyChip = $(".chip[data-filter]");
+    if (!anyChip) return;
+    var host = anyChip.parentNode;
+    if (!host) return;
+
+    function hasChip(name) {
+      return !!host.querySelector(".chip[data-filter='" + name + "']");
+    }
+
+    // 確保：全部 chip 存在
+    if (!hasChip("全部")) {
+      var bAll = document.createElement("button");
+      bAll.className = "chip";
+      bAll.type = "button";
+      bAll.setAttribute("data-filter", "全部");
+      bAll.textContent = "全部";
+      host.insertBefore(bAll, host.firstChild);
+    }
+
+    // 依序補上缺少的分類 chip（不重複）
+    for (var i = 0; i < KB_CATS.length; i++) {
+      var name = KB_CATS[i];
+      if (hasChip(name)) continue;
+      var b = document.createElement("button");
+      b.className = "chip";
+      b.type = "button";
+      b.setAttribute("data-filter", name);
+      b.textContent = name;
+      host.appendChild(b);
+    }
+  }
 
   /* ---------- KB ---------- */
   var kbForm = $("#kbForm");
@@ -551,6 +621,7 @@
   var kbEmpty = $("#kbEmpty");
   var kbExportBtn = $("#kbExport");
   var kbClearBtn = $("#kbClear");
+
   var kbData = [];
   var kbFilter = "全部";
 
@@ -562,9 +633,22 @@
       var arr = JSON.parse(raw);
       if (Array.isArray(arr)) kbData = arr;
     } catch (e) { kbData = []; }
+
+    // v19.1：把舊資料「經絡」轉成「筋絡」（並順手補缺欄位）
+    var changed = false;
+    for (var i = 0; i < kbData.length; i++) {
+      if (!kbData[i]) continue;
+      var old = kbData[i].cat;
+      var next = normalizeKBCategory(old);
+      if (next !== old) { kbData[i].cat = next; changed = true; }
+      if (!kbData[i].id) { kbData[i].id = uid("kb"); changed = true; }
+      if (!kbData[i].createdAt) { kbData[i].createdAt = nowISO(); changed = true; }
+    }
+    if (changed) kbSave();
   }
+
   function kbSave() { try { localStorage.setItem(KB_KEY, JSON.stringify(kbData)); } catch (e) {} }
-  function kbMatchesFilter(item) { return (kbFilter === "全部") ? true : (item && item.cat === kbFilter); }
+  function kbMatchesFilter(item) { return (kbFilter === "全部") ? true : (item && normalizeKBCategory(item.cat) === kbFilter); }
 
   function kbRender() {
     if (!kbList || !kbEmpty) return;
@@ -585,7 +669,7 @@
 
       var cat = document.createElement("div");
       cat.className = "kbCat";
-      cat.textContent = safeText(it.cat);
+      cat.textContent = normalizeKBCategory(it.cat);
 
       var title = document.createElement("div");
       title.className = "kbTitle";
@@ -616,7 +700,6 @@
 
       row.appendChild(metaWrap);
       row.appendChild(right);
-
       kbList.appendChild(row);
     }
 
@@ -624,11 +707,13 @@
   }
 
   function kbSetFilter(name) {
+    name = normalizeKBCategory(name);
     kbFilter = safeText(name) || "全部";
-    var chips = $all(".chip");
+
+    var chips = $all(".chip[data-filter]");
     for (var i = 0; i < chips.length; i++) {
       var c = chips[i];
-      var f = c.getAttribute("data-filter") || "全部";
+      var f = normalizeKBCategory(c.getAttribute("data-filter") || "全部");
       if (f === kbFilter) c.classList.add("active");
       else c.classList.remove("active");
     }
@@ -638,7 +723,7 @@
   function kbAdd(cat, title, text) {
     var item = {
       id: uid("kb"),
-      cat: safeText(cat).trim() || "筆記",
+      cat: normalizeKBCategory(cat) || "筆記",
       title: safeText(title).trim() || "（無標題）",
       text: safeText(text).trim() || "",
       createdAt: nowISO()
@@ -647,6 +732,7 @@
     kbSave();
     kbRender();
   }
+
   function kbDelete(id) {
     id = safeText(id);
     var next = [];
@@ -655,17 +741,18 @@
     kbSave();
     kbRender();
   }
+
   function kbClearAll() { kbData = []; kbSave(); kbRender(); }
 
   function kbExport() {
     var lines = [];
-    lines.push("作息秘書 v19｜知識區匯出");
+    lines.push("作息秘書 v19.1｜知識區匯出");
     lines.push("篩選：" + kbFilter);
     lines.push("------");
     for (var i = 0; i < kbData.length; i++) {
       var it = kbData[i];
       if (!kbMatchesFilter(it)) continue;
-      lines.push("【" + it.cat + "】" + it.title);
+      lines.push("【" + normalizeKBCategory(it.cat) + "】" + it.title);
       lines.push(it.text);
       lines.push("");
     }
@@ -678,6 +765,12 @@
   }
 
   function bindKB() {
+    // v19.1：先修正分類 UI（select / chips）
+    renameSelectOption(kbCat, KB_CAT_LEGACY, KB_CAT_NEW);
+    for (var i = 0; i < KB_CATS.length; i++) ensureSelectOption(kbCat, KB_CATS[i]);
+    renameKBChipsInDOM();
+    ensureKBChipsExist();
+
     kbLoad();
     kbSetFilter("全部");
 
@@ -715,10 +808,12 @@
     if (kbClearBtn) kbClearBtn.addEventListener("click", function (e) {
       e.preventDefault();
       ttsWarmup();
+
       if (kbData.length === 0) {
         openDlg("提示", "<p>目前沒有資料可清空。</p>");
         return;
       }
+
       openDlg("確認清空？",
         "<p>這會清空所有知識區資料（永久）。</p>" +
         "<p style='opacity:.8'>若要先備份，請先按「匯出」。</p>"
@@ -748,6 +843,7 @@
   var relEmpty = $("#relEmpty");
   var relExportBtn = $("#relExport");
   var relClearBtn = $("#relClear");
+
   var relData = [];
   var relFilter = "全部";
 
@@ -854,11 +950,12 @@
     relSave();
     relRender();
   }
+
   function relClearAll() { relData = []; relSave(); relRender(); }
 
   function relExport() {
     var lines = [];
-    lines.push("作息秘書 v19｜關係滋養區匯出");
+    lines.push("作息秘書 v19.1｜關係滋養區匯出");
     lines.push("篩選：" + relFilter);
     lines.push("------");
     for (var i = 0; i < relData.length; i++) {
@@ -915,10 +1012,12 @@
     if (relClearBtn) relClearBtn.addEventListener("click", function (e) {
       e.preventDefault();
       ttsWarmup();
+
       if (relData.length === 0) {
         openDlg("提示", "<p>目前沒有資料可清空。</p>");
         return;
       }
+
       openDlg("確認清空？",
         "<p>這會清空所有關係滋養資料（永久）。</p>" +
         "<p style='opacity:.8'>若要先備份，請先按「匯出」。</p>"
@@ -994,6 +1093,7 @@
     for (var i = 0; i < bdayData.length; i++) {
       if (bdayData[i].md === md) names.push(bdayData[i].name);
     }
+
     if (names.length) {
       bdayTodayBox.style.display = "block";
       bdayTodayBox.innerHTML = "🎂 今天 " + escapeHtml(md) + "：<b>" + escapeHtml(names.join("、")) + "</b>";
@@ -1083,15 +1183,11 @@
     bdayRender();
   }
 
-  function bdayClearAll() {
-    bdayData = [];
-    bdaySave();
-    bdayRender();
-  }
+  function bdayClearAll() { bdayData = []; bdaySave(); bdayRender(); }
 
   function bdayExport() {
     var lines = [];
-    lines.push("作息秘書 v19｜生日提醒匯出");
+    lines.push("作息秘書 v19.1｜生日提醒匯出");
     lines.push("------");
     for (var i = 0; i < bdayData.length; i++) {
       var it = bdayData[i];
@@ -1117,7 +1213,7 @@
       if (it.md !== md) continue;
       if ((it.time || "09:00") !== hm) continue;
 
-      var lockKey = "sleepSecretary_v19_bday_fired_" + md + "_" + hm + "_" + it.id;
+      var lockKey = "sleepSecretary_v19_1_bday_fired_" + md + "_" + hm + "_" + it.id;
       try {
         if (localStorage.getItem(lockKey)) continue;
         localStorage.setItem(lockKey, "1");
@@ -1146,6 +1242,7 @@
         var msgVal = bdayMsg ? bdayMsg.value : "";
 
         var md = normalizeMD(dateVal);
+
         if (!safeText(name).trim()) {
           speak("請輸入姓名。");
           openDlg("提醒", "<p>請輸入「對象」。</p>");
@@ -1183,6 +1280,7 @@
       }
 
       openDlg("確認清空？", "<p>這會清空所有生日提醒（永久）。</p>");
+
       dlgOk.onclick = null;
       dlgOk.addEventListener("click", function handler() {
         dlgOk.removeEventListener("click", handler);
@@ -1195,12 +1293,13 @@
 
     if (bdayTicker) clearInterval(bdayTicker);
     bdayTicker = setInterval(function () { bdayCheckDue(); }, 15000);
+
     bdayShowToday();
     bdayCheckDue();
   }
 
   /* ==========================================================
-     Global click delegation（Tabs / Cards / chips / delete）
+  Global click delegation（Tabs / Cards / chips / delete）
   ========================================================== */
   function bindGlobalDelegation() {
     document.addEventListener("click", function (e) {
@@ -1239,7 +1338,7 @@
         return;
       }
 
-      // KB delete
+      // KB delete（排除 REL/BDAY）
       var kdel = closest(t, ".kbDel");
       if (kdel && kbList && kbList.contains(kdel) && !closest(kdel, ".relDel") && !closest(kdel, ".bdayDel")) {
         var itemEl = closest(kdel, ".kbItem");
@@ -1265,6 +1364,7 @@
         if (bid) { bdayDelete(bid); speak("已刪除。"); }
         return;
       }
+
     }, false);
   }
 
@@ -1287,6 +1387,7 @@
   /* ---------- Init ---------- */
   function init() {
     ensureBtnTypesIn(document);
+
     bindDialog();
     bindInstallHelp();
     bindGlobalDelegation();
