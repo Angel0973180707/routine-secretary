@@ -1,41 +1,50 @@
 <!doctype html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-app="sleep-secretary" data-version="19.1.1">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <title>作息秘書 v19.1.1</title>
+  <meta name="description" content="作息秘書｜作息提醒＋關係滋養：微休息、護眼、番茄、知識區、關係滋養、生日提醒（可加入主畫面使用）" />
+  <meta name="theme-color" content="#0b241d" />
+  <meta name="background-color" content="#0b241d" />
 
   <!-- PWA -->
   <link rel="manifest" href="./manifest.webmanifest" />
-  <meta name="theme-color" content="#0b241d" />
-
-  <!-- ✅ App icon / 縮圖（Android + iOS 常用） -->
-  <!-- 你目前圖示檔在 repo 根目錄：icon-192.png / icon-512.png -->
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
 
-  <!-- ✅ CSS（最重要：CSS 沒作用通常就是這行缺了或路徑錯） -->
-  <link rel="stylesheet" href="./style.css" />
+  <!-- ✅ CSS（外連） -->
+  <link rel="stylesheet" href="./style.css?v=1911" />
 
-  <title>作息秘書 v17</title>
+  <!-- ✅ 版本策略（重要）
+       以後升級只要改這兩個常數即可：APP_VERSION / ASSET_TAG
+       - APP_VERSION：顯示版本（例如 19.1.2）
+       - ASSET_TAG：快取破壞用（例如 1912）
+  -->
+  <script>
+    window.APP_VERSION = "19.1.1";
+    window.ASSET_TAG = "1911";
+  </script>
 </head>
 
 <body>
   <!-- =========================
-  作息秘書 v17（完整 HTML）
-  - v16 基礎上新增「系統計時器」按鈕（微休息/護眼/番茄）
-  - 關係滋養區 + 生日提醒 + 知識區 保留
+  作息秘書 v19.1.1（HTML）
+  ✅ 匹配 v19.1.1 JS（app.js）所需元素 id
+  ✅ KB 類別：經絡→筋絡 + 運動 + 其他 + 備忘（HTML 直接補齊）
+  ✅ 讓未來升級可自動連到新版 JS：使用 ?v=ASSET_TAG
+  ✅ PWA 註冊 + 離線快取：內建註冊 service worker（sw.js）
+     （若你 repo 已經有 sw.js，它就會生效；若沒有，下面也有提示）
   ========================= -->
 
   <div id="app" class="app">
-
     <!-- Top -->
     <header class="topbar">
       <div class="brand">
         <div class="brandTitle">作息秘書</div>
-        <div class="brandSub">
-          <span>作息提醒＋關係滋養</span>
-        </div>
+        <div class="brandSub"><span>作息提醒＋關係滋養</span></div>
       </div>
       <button id="btnInstallHelp" class="btnGhost" type="button">安裝教學</button>
     </header>
@@ -50,17 +59,12 @@
 
     <!-- Main -->
     <main class="main">
-
       <!-- HOME -->
       <section class="view active" id="view-home">
-
         <!-- Quick Cards -->
         <div class="panel">
           <div class="panelHead">
-            <div class="panelTitle">
-              <span class="dotLed"></span>
-              選一個模式
-            </div>
+            <div class="panelTitle"><span class="dotLed"></span>選一個模式</div>
             <div class="panelHint">點卡片或上方按鈕都可切換。</div>
           </div>
 
@@ -95,9 +99,7 @@
 
           <div class="note">
             <div class="noteTitle">小提醒</div>
-            <div class="noteText">
-              第一次按「開始」可能會觸發瀏覽器允許語音（倒數結束才會播報）。
-            </div>
+            <div class="noteText">第一次按「開始」可能會觸發瀏覽器允許語音（倒數結束才會播報）。</div>
           </div>
         </div>
 
@@ -113,9 +115,11 @@
               <span class="kbLabel">分類</span>
               <select id="kbCat" class="kbInput">
                 <option value="護眼">護眼</option>
-                <option value="經絡">經絡</option>
+                <option value="筋絡">筋絡</option>
+                <option value="運動">運動</option>
                 <option value="學習效率">學習效率</option>
-                <option value="筆記">筆記</option>
+                <option value="其他">其他</option>
+                <option value="備忘">備忘</option>
               </select>
             </label>
 
@@ -126,7 +130,7 @@
 
             <label class="kbField kbFieldGrow">
               <span class="kbLabel">內容</span>
-              <input id="kbText" class="kbInput" type="text" maxlength="160" placeholder="例如：每 20 分鐘看遠 20 呎 20 秒" />
+              <input id="kbText" class="kbInput" type="text" maxlength="160" placeholder="例如：每 20 分鐘看遠 20 呎 20 秒（可貼 https:// 連結）" />
             </label>
 
             <button class="btnPrimary" type="submit">新增</button>
@@ -137,8 +141,11 @@
               <span class="kbFilterLabel">篩選：</span>
               <button class="chip active" data-filter="全部" type="button">全部</button>
               <button class="chip" data-filter="護眼" type="button">護眼</button>
-              <button class="chip" data-filter="經絡" type="button">經絡</button>
+              <button class="chip" data-filter="筋絡" type="button">筋絡</button>
+              <button class="chip" data-filter="運動" type="button">運動</button>
               <button class="chip" data-filter="學習效率" type="button">學習效率</button>
+              <button class="chip" data-filter="其他" type="button">其他</button>
+              <button class="chip" data-filter="備忘" type="button">備忘</button>
               <button class="chip" data-filter="筆記" type="button">筆記</button>
             </div>
 
@@ -255,7 +262,6 @@
           <div id="bdayEmpty" class="kbEmpty">尚無資料</div>
           <div id="bdayList" class="kbList" aria-live="polite"></div>
         </div>
-
       </section>
 
       <!-- MICRO -->
@@ -321,7 +327,6 @@
           </div>
         </div>
       </section>
-
     </main>
 
     <!-- Dialog -->
@@ -332,10 +337,39 @@
         <button id="dlgOk" class="btnPrimary" type="button">確定</button>
       </div>
     </dialog>
-
   </div>
 
-  <!-- ✅ JS（放 body 最後，避免抓不到元素） -->
-  <script src="./app.js？v=19.1.1"></script>
+  <!-- =========================
+  ✅ PWA 註冊（Service Worker）
+  - 你需要在 repo 根目錄放一個 sw.js 才會真的離線
+  - 若已存在 sw.js：這段會自動註冊
+  - 若還沒有 sw.js：我下一步可以直接給你 sw.js 完整檔
+  ========================= -->
+  <script>
+    (function () {
+      // 讓後續任何檔案都可用同一個版本參數
+      var tag = window.ASSET_TAG || "1911";
+
+      // 嘗試把 CSS/JS 的 v 參數統一（避免你忘記改）
+      try {
+        var css = document.querySelector('link[href*="style.css"]');
+        if (css && css.href.indexOf("v=") === -1) css.href = "./style.css?v=" + encodeURIComponent(tag);
+      } catch (e) {}
+
+      // Service Worker
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("./sw.js?v=" + encodeURIComponent(tag))
+            .catch(function (err) {
+              // 註冊失敗通常是：sw.js 不存在 / 路徑不對 / GitHub Pages scope 問題
+              console.warn("SW register failed:", err);
+            });
+        });
+      }
+    })();
+  </script>
+
+  <!-- ✅ JS（外連 + 版本參數） -->
+  <script src="./app.js?v=1911"></script>
 </body>
-                </html>
+</html>
