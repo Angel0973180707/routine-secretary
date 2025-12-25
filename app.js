@@ -1,9 +1,12 @@
 /* =========================
-作息秘書 v19.1（完整 JS｜可直接覆蓋 app.js）
-- 承接 v19：Tabs / Cards / 三種計時器 / Dialog / KB / REL / 生日提醒 / 系統計時器補救
-- v19.1 新增：
-  A) 知識區 KB：自動抓取連結（內容/標題出現 http(s) 就變成可點）
-  B) 首頁注入「📌 今日重要行事」面板（JS-only，不改 HTML）
+作息秘書 v19.1.1（完整 JS｜可直接覆蓋 app.js）
+✅ 修正重點（你說「現在變成無法新增」）：
+- Dialog 的 dlgOk 不再用 addEventListener 疊加（避免事件累積導致按鈕/表單失效）
+- 所有「確認清空」一律改用 dlgOk.onclick 單一覆寫，最後再 bindDialog() 還原
+✅ 其他保留：
+- Tabs / Cards / 三種計時器 / 系統計時器補救（iOS 捷徑優先）/ KB / REL / 生日提醒
+✅ KB 類別更新（經絡→筋絡 + 運動 + 其他 + 備忘）
+✅ KB 內容可放網址：自動抓取連結（http/https），渲染成可點開
 ========================= */
 
 (function () {
@@ -53,19 +56,28 @@
     for (var i = 0; i < btns.length; i++) ensureBtnType(btns[i]);
   }
 
-  /* ---------- URL detector (v19.1) ---------- */
-  var URL_RE = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/ig;
-  function normalizeUrl(u) {
-    u = safeText(u).trim();
-    if (!u) return "";
-    if (/^www\./i.test(u)) return "https://" + u;
-    return u;
-  }
-  function extractFirstUrl(text) {
+  /* ---------- URL detect / render ---------- */
+  function extractUrls(text) {
     text = safeText(text);
-    var m = text.match(URL_RE);
-    if (!m || !m.length) return "";
-    return normalizeUrl(m[0]);
+    var re = /(https?:\/\/[^\s<>"']+)/ig;
+    var m, out = [];
+    while ((m = re.exec(text)) !== null) out.push(m[1]);
+    return out;
+  }
+  function renderTextWithLinks(text) {
+    var raw = safeText(text);
+    var urls = extractUrls(raw);
+    if (!urls.length) return escapeHtml(raw);
+    // 逐一替換，避免 replaceAll
+    var html = escapeHtml(raw);
+    for (var i = 0; i < urls.length; i++) {
+      var u = urls[i];
+      var ue = escapeHtml(u);
+      var a = "<a href=\"" + ue + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + ue + "</a>";
+      // 用 split/join 全部替換（避免 replaceAll）
+      html = html.split(ue).join(a);
+    }
+    return html;
   }
 
   /* ---------- TTS ---------- */
@@ -90,7 +102,7 @@
     } catch (e) {}
   }
 
-  /* ---------- Dialog ---------- */
+  /* ---------- Dialog（v19.1.1 關鍵修正：只用 onclick，避免事件累積） ---------- */
   var dlg = $("#dlg");
   var dlgTitle = $("#dlgTitle");
   var dlgBody = $("#dlgBody");
@@ -119,8 +131,7 @@
   function bindDialog() {
     if (!dlgOk) return;
     ensureBtnType(dlgOk);
-    dlgOk.onclick = null;
-    dlgOk.addEventListener("click", function () { closeDlg(); });
+    dlgOk.onclick = function () { closeDlg(); }; // ✅ 永遠只有一個
   }
 
   /* ---------- View switching ---------- */
@@ -149,7 +160,7 @@
   }
 
   /* ==========================================================
-  v19：系統計時器補救（iOS 捷徑 / Android intent）
+     系統計時器補救（iOS 捷徑 / Android intent）
   ========================================================== */
   function isIOS() {
     var ua = navigator.userAgent || "";
@@ -218,12 +229,11 @@
     var btn = $("#btnRunShortcutNow");
     if (btn && isIOS()) {
       ensureBtnType(btn);
-      btn.onclick = null;
-      btn.addEventListener("click", function () {
+      btn.onclick = function () {
         ttsWarmup();
         speak("開啟捷徑");
         runIOSShortcutByName(shortcutNameSuggested);
-      });
+      };
     }
   }
 
@@ -256,19 +266,18 @@
     b.type = "button";
     b.textContent = "一鍵捷徑";
     b.setAttribute("data-ios-shortcut", "1");
-    b.addEventListener("click", function (e) {
+    b.onclick = function (e) {
       e.preventDefault();
       ttsWarmup();
       speak("開啟捷徑");
       runIOSShortcutByName(shortcutName);
       setTimeout(function () { showOneKeyHelp(modeTitle, shortcutName); }, 650);
-    });
-
+    };
     btnRowEl.insertBefore(b, btnRowEl.firstChild);
   }
 
   /* ==========================================================
-  Timers（三個倒數：微休息 / 護眼 / 蕃茄）
+     Timers（三個倒數）
   ========================================================== */
   var DEFAULTS = {
     microSec: 60,
@@ -300,7 +309,7 @@
   var eye = { focusSec: DEFAULTS.eyeFocusMin * 60, relaxSec: DEFAULTS.eyeRelaxSec, phase: "focus", left: DEFAULTS.eyeFocusMin * 60, running: false, t: null };
   var pomo = { focusMin: DEFAULTS.pomoFocusMin, breakMin: DEFAULTS.pomoBreakMin, phase: "focus", left: DEFAULTS.pomoFocusMin * 60, running: false, t: null };
 
-  async function fireReminder(title, body, ttsText) {
+  function fireReminder(title, body, ttsText) {
     vibrate(120);
     ttsWarmup();
     speak(ttsText || title);
@@ -315,22 +324,19 @@
     if (microTimeEl) microTimeEl.textContent = fmtMMSS(micro.left);
     if (microHintEl) microHintEl.textContent = micro.running ? "進行中…" : "準備好了就開始（預設 60 秒，可調）";
   }
-
-  async function microDone() {
+  function microDone() {
     micro.left = 0; micro.running = false;
     if (micro.t) { clearInterval(micro.t); micro.t = null; }
     microRender();
-    await fireReminder("微休息完成 ✅", "喝口水、放鬆肩頸。", "微休息結束，做得好。");
+    fireReminder("微休息完成 ✅", "喝口水、放鬆肩頸。", "微休息結束，做得好。");
     openDlg("完成 ✅", "<p>微休息結束～喝口水、放鬆肩頸。</p>");
   }
-
   function microTick() {
     if (!micro.running) return;
     micro.left -= 1;
     if (micro.left <= 0) { microDone(); return; }
     microRender();
   }
-
   function microStart() {
     ttsWarmup();
     if (micro.running) return;
@@ -338,13 +344,11 @@
     if (!micro.t) micro.t = setInterval(microTick, 1000);
     microRender();
   }
-
   function microPause() {
     micro.running = false;
     if (micro.t) { clearInterval(micro.t); micro.t = null; }
     microRender();
   }
-
   function microReset() {
     micro.running = false;
     if (micro.t) { clearInterval(micro.t); micro.t = null; }
@@ -352,11 +356,10 @@
     micro.left = micro.total;
     microRender();
   }
-
   function bindMicro() {
-    if (microStartBtn) microStartBtn.addEventListener("click", function (e) { e.preventDefault(); microStart(); });
-    if (microPauseBtn) microPauseBtn.addEventListener("click", function (e) { e.preventDefault(); microPause(); });
-    if (microResetBtn) microResetBtn.addEventListener("click", function (e) { e.preventDefault(); microReset(); });
+    if (microStartBtn) microStartBtn.onclick = function (e) { e.preventDefault(); microStart(); };
+    if (microPauseBtn) microPauseBtn.onclick = function (e) { e.preventDefault(); microPause(); };
+    if (microResetBtn) microResetBtn.onclick = function (e) { e.preventDefault(); microReset(); };
     microRender();
   }
 
@@ -366,28 +369,25 @@
       ? ("20 分鐘專注中（預設，可調）")
       : ("看遠 20 呎｜20 秒（預設，可調）");
   }
-
-  async function eyeSwitchPhase() {
+  function eyeSwitchPhase() {
     if (eye.phase === "focus") {
       eye.phase = "relax";
       eye.left = eye.relaxSec;
-      await fireReminder("護眼提醒 👁️", "請看遠 20 秒（約 6 公尺）。", "護眼提醒，請看遠二十秒。");
+      fireReminder("護眼提醒 👁️", "請看遠 20 秒（約 6 公尺）。", "護眼提醒，請看遠二十秒。");
       openDlg("護眼提醒 👁️", "<p>看遠 20 呎（約 6 公尺）<br>持續 20 秒。</p>");
     } else {
       eye.phase = "focus";
       eye.left = eye.focusSec;
-      await fireReminder("回到專注 ✅", "開始 20 分鐘。", "回到專注，開始二十分鐘。");
+      fireReminder("回到專注 ✅", "開始 20 分鐘。", "回到專注，開始二十分鐘。");
     }
     eyeRender();
   }
-
   function eyeTick() {
     if (!eye.running) return;
     eye.left -= 1;
     if (eye.left <= 0) { eyeSwitchPhase(); return; }
     eyeRender();
   }
-
   function eyeStart() {
     ttsWarmup();
     if (eye.running) return;
@@ -395,13 +395,11 @@
     if (!eye.t) eye.t = setInterval(eyeTick, 1000);
     eyeRender();
   }
-
   function eyePause() {
     eye.running = false;
     if (eye.t) { clearInterval(eye.t); eye.t = null; }
     eyeRender();
   }
-
   function eyeReset() {
     eye.running = false;
     if (eye.t) { clearInterval(eye.t); eye.t = null; }
@@ -411,11 +409,10 @@
     eye.left = eye.focusSec;
     eyeRender();
   }
-
   function bindEye() {
-    if (eyeStartBtn) eyeStartBtn.addEventListener("click", function (e) { e.preventDefault(); eyeStart(); });
-    if (eyePauseBtn) eyePauseBtn.addEventListener("click", function (e) { e.preventDefault(); eyePause(); });
-    if (eyeResetBtn) eyeResetBtn.addEventListener("click", function (e) { e.preventDefault(); eyeReset(); });
+    if (eyeStartBtn) eyeStartBtn.onclick = function (e) { e.preventDefault(); eyeStart(); };
+    if (eyePauseBtn) eyePauseBtn.onclick = function (e) { e.preventDefault(); eyePause(); };
+    if (eyeResetBtn) eyeResetBtn.onclick = function (e) { e.preventDefault(); eyeReset(); };
     eyeRender();
   }
 
@@ -425,29 +422,26 @@
       ? ("專注中（預設 25 分，可調）")
       : ("休息中（預設 5 分，可調）");
   }
-
-  async function pomoSwitchPhase() {
+  function pomoSwitchPhase() {
     if (pomo.phase === "focus") {
       pomo.phase = "break";
       pomo.left = pomo.breakMin * 60;
-      await fireReminder("番茄休息 🍅", "休息一下：喝水、伸展、走兩步。", "番茄鐘，進入休息時間。");
+      fireReminder("番茄休息 🍅", "休息一下：喝水、伸展、走兩步。", "番茄鐘，進入休息時間。");
       openDlg("番茄休息 🍅", "<p>休息一下：喝水、伸展、走兩步。</p>");
     } else {
       pomo.phase = "focus";
       pomo.left = pomo.focusMin * 60;
-      await fireReminder("番茄開始 🍅", "新一輪專注開始～", "番茄鐘，開始專注。");
+      fireReminder("番茄開始 🍅", "新一輪專注開始～", "番茄鐘，開始專注。");
       openDlg("番茄開始 🍅", "<p>新一輪專注開始～</p>");
     }
     pomoRender();
   }
-
   function pomoTick() {
     if (!pomo.running) return;
     pomo.left -= 1;
     if (pomo.left <= 0) { pomoSwitchPhase(); return; }
     pomoRender();
   }
-
   function pomoStart() {
     ttsWarmup();
     if (pomo.running) return;
@@ -455,13 +449,11 @@
     if (!pomo.t) pomo.t = setInterval(pomoTick, 1000);
     pomoRender();
   }
-
   function pomoPause() {
     pomo.running = false;
     if (pomo.t) { clearInterval(pomo.t); pomo.t = null; }
     pomoRender();
   }
-
   function pomoReset() {
     pomo.running = false;
     if (pomo.t) { clearInterval(pomo.t); pomo.t = null; }
@@ -471,17 +463,14 @@
     pomo.left = pomo.focusMin * 60;
     pomoRender();
   }
-
   function bindPomo() {
-    if (pomoStartBtn) pomoStartBtn.addEventListener("click", function (e) { e.preventDefault(); pomoStart(); });
-    if (pomoPauseBtn) pomoPauseBtn.addEventListener("click", function (e) { e.preventDefault(); pomoPause(); });
-    if (pomoResetBtn) pomoResetBtn.addEventListener("click", function (e) { e.preventDefault(); pomoReset(); });
+    if (pomoStartBtn) pomoStartBtn.onclick = function (e) { e.preventDefault(); pomoStart(); };
+    if (pomoPauseBtn) pomoPauseBtn.onclick = function (e) { e.preventDefault(); pomoPause(); };
+    if (pomoResetBtn) pomoResetBtn.onclick = function (e) { e.preventDefault(); pomoReset(); };
     pomoRender();
   }
 
-  /* ==========================================================
-  系統計時器按鈕（HTML id）
-  ========================================================== */
+  /* ---------- System timer buttons ---------- */
   var microSysBtn = $("#microSys");
   var eyeSysFocusBtn = $("#eyeSysFocus");
   var eyeSysRelaxBtn = $("#eyeSysRelax");
@@ -496,45 +485,30 @@
     insertIOSShortcutButtonFirst(eyeRow, "作息-護眼20分鐘", "護眼｜20 分鐘");
     insertIOSShortcutButtonFirst(pomoRow, "作息-番茄25分鐘", "蕃茄｜25 分鐘");
 
-    if (microSysBtn) {
-      ensureBtnType(microSysBtn);
-      microSysBtn.addEventListener("click", function (e) {
-        e.preventDefault();
-        tryStartSystemTimer(micro.total, "作息秘書｜微休息 " + micro.total + " 秒", "作息-微休息60秒", "微休息｜60 秒");
-      });
-    }
-
-    if (eyeSysFocusBtn) {
-      ensureBtnType(eyeSysFocusBtn);
-      eyeSysFocusBtn.addEventListener("click", function (e) {
-        e.preventDefault();
-        tryStartSystemTimer(eye.focusSec, "作息秘書｜護眼 20 分鐘", "作息-護眼20分鐘", "護眼｜20 分鐘");
-      });
-    }
-
-    if (eyeSysRelaxBtn) {
-      ensureBtnType(eyeSysRelaxBtn);
-      eyeSysRelaxBtn.addEventListener("click", function (e) {
-        e.preventDefault();
-        tryStartSystemTimer(eye.relaxSec, "作息秘書｜護眼 看遠 20 秒", "作息-護眼20秒", "護眼｜20 秒");
-      });
-    }
-
-    if (pomoSysBtn) {
-      ensureBtnType(pomoSysBtn);
-      pomoSysBtn.addEventListener("click", function (e) {
-        e.preventDefault();
-        tryStartSystemTimer(pomo.focusMin * 60, "作息秘書｜番茄 " + pomo.focusMin + " 分鐘", "作息-番茄25分鐘", "蕃茄｜25 分鐘");
-      });
-    }
+    if (microSysBtn) microSysBtn.onclick = function (e) {
+      e.preventDefault();
+      tryStartSystemTimer(micro.total, "作息秘書｜微休息 " + micro.total + " 秒", "作息-微休息60秒", "微休息｜60 秒");
+    };
+    if (eyeSysFocusBtn) eyeSysFocusBtn.onclick = function (e) {
+      e.preventDefault();
+      tryStartSystemTimer(eye.focusSec, "作息秘書｜護眼 20 分鐘", "作息-護眼20分鐘", "護眼｜20 分鐘");
+    };
+    if (eyeSysRelaxBtn) eyeSysRelaxBtn.onclick = function (e) {
+      e.preventDefault();
+      tryStartSystemTimer(eye.relaxSec, "作息秘書｜護眼 看遠 20 秒", "作息-護眼20秒", "護眼｜20 秒");
+    };
+    if (pomoSysBtn) pomoSysBtn.onclick = function (e) {
+      e.preventDefault();
+      tryStartSystemTimer(pomo.focusMin * 60, "作息秘書｜番茄 " + pomo.focusMin + " 分鐘", "作息-番茄25分鐘", "蕃茄｜25 分鐘");
+    };
   }
 
   /* ==========================================================
-  Storage keys + KB / REL / BDAY
+     Storage keys + KB / REL / BDAY
   ========================================================== */
-  var KB_KEY = "sleepSecretary_v19_kb";
-  var REL_KEY = "sleepSecretary_v19_rel";
-  var BDAY_KEY = "sleepSecretary_v19_bday";
+  var KB_KEY = "sleepSecretary_v1911_kb";
+  var REL_KEY = "sleepSecretary_v1911_rel";
+  var BDAY_KEY = "sleepSecretary_v1911_bday";
 
   /* ---------- KB ---------- */
   var kbForm = $("#kbForm");
@@ -548,6 +522,64 @@
   var kbData = [];
   var kbFilter = "全部";
 
+  function kbNormalizeCats() {
+    // ✅ 把舊資料「經絡」改成「筋絡」
+    for (var i = 0; i < kbData.length; i++) {
+      if (kbData[i] && kbData[i].cat === "經絡") kbData[i].cat = "筋絡";
+    }
+  }
+
+  function kbEnsureOptions() {
+    // ✅ HTML 不改的情況下，用 JS 補上新分類 + chips
+    if (kbCat) {
+      var want = ["護眼", "筋絡", "運動", "學習效率", "其他", "備忘"];
+      var existing = {};
+      for (var i = 0; i < kbCat.options.length; i++) existing[kbCat.options[i].value] = 1;
+      for (var j = 0; j < want.length; j++) {
+        if (!existing[want[j]]) {
+          var opt = document.createElement("option");
+          opt.value = want[j];
+          opt.textContent = want[j];
+          kbCat.appendChild(opt);
+        }
+      }
+      // 若還留著「經絡」選項，改字面顯示成筋絡
+      for (var k = 0; k < kbCat.options.length; k++) {
+        if (kbCat.options[k].value === "經絡") {
+          kbCat.options[k].value = "筋絡";
+          kbCat.options[k].textContent = "筋絡";
+        }
+      }
+    }
+
+    // chips：把 data-filter="經絡" 改成 筋絡，並補上新 chips（運動/其他/備忘）
+    var kbFilterWrap = $(".kbFilter");
+    if (kbFilterWrap) {
+      var chips = $all(".chip[data-filter]", kbFilterWrap);
+      var has = {};
+      for (var c = 0; c < chips.length; c++) {
+        var f = chips[c].getAttribute("data-filter") || "";
+        if (f === "經絡") {
+          chips[c].setAttribute("data-filter", "筋絡");
+          chips[c].textContent = "筋絡";
+          f = "筋絡";
+        }
+        has[f] = 1;
+      }
+      var add = ["筋絡", "運動", "其他", "備忘"];
+      for (var a = 0; a < add.length; a++) {
+        if (!has[add[a]]) {
+          var b = document.createElement("button");
+          b.className = "chip";
+          b.type = "button";
+          b.setAttribute("data-filter", add[a]);
+          b.textContent = add[a];
+          kbFilterWrap.appendChild(b);
+        }
+      }
+    }
+  }
+
   function kbLoad() {
     kbData = [];
     try {
@@ -556,11 +588,11 @@
       var arr = JSON.parse(raw);
       if (Array.isArray(arr)) kbData = arr;
     } catch (e) { kbData = []; }
+    kbNormalizeCats();
   }
   function kbSave() { try { localStorage.setItem(KB_KEY, JSON.stringify(kbData)); } catch (e) {} }
   function kbMatchesFilter(item) { return (kbFilter === "全部") ? true : (item && item.cat === kbFilter); }
 
-  // v19.1：KB 顯示可點連結（不改欄位，從 title/text 自動抓第一個網址）
   function kbRender() {
     if (!kbList || !kbEmpty) return;
     kbList.innerHTML = "";
@@ -588,39 +620,12 @@
 
       var text = document.createElement("div");
       text.className = "kbText";
-      text.textContent = safeText(it.text);
+      // ✅ 支援網址：可點開
+      text.innerHTML = renderTextWithLinks(it.text);
 
-      // ✅ 自動抓連結並附上一行可點
-      var link = extractFirstUrl((it.title || "") + " " + (it.text || ""));
-      if (link) {
-        var linkWrap = document.createElement("div");
-        linkWrap.className = "kbText";
-        linkWrap.style.marginTop = "6px";
-        linkWrap.style.opacity = "0.95";
-
-        var a = document.createElement("a");
-        a.href = link;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.textContent = "🔗 開啟連結";
-        a.style.textDecoration = "underline";
-        a.style.wordBreak = "break-all";
-
-        // 防止點連結被外層 click delegation 擋掉
-        a.addEventListener("click", function (ev) {
-          ev.stopPropagation();
-        });
-
-        linkWrap.appendChild(a);
-        metaWrap.appendChild(cat);
-        metaWrap.appendChild(title);
-        metaWrap.appendChild(text);
-        metaWrap.appendChild(linkWrap);
-      } else {
-        metaWrap.appendChild(cat);
-        metaWrap.appendChild(title);
-        metaWrap.appendChild(text);
-      }
+      metaWrap.appendChild(cat);
+      metaWrap.appendChild(title);
+      metaWrap.appendChild(text);
 
       var right = document.createElement("div");
       right.className = "kbRight";
@@ -647,7 +652,7 @@
 
   function kbSetFilter(name) {
     kbFilter = safeText(name) || "全部";
-    var chips = $all(".chip");
+    var chips = $all(".chip[data-filter]");
     for (var i = 0; i < chips.length; i++) {
       var c = chips[i];
       var f = c.getAttribute("data-filter") || "全部";
@@ -660,7 +665,7 @@
   function kbAdd(cat, title, text) {
     var item = {
       id: uid("kb"),
-      cat: safeText(cat).trim() || "筆記",
+      cat: safeText(cat).trim() || "備忘",
       title: safeText(title).trim() || "（無標題）",
       text: safeText(text).trim() || "",
       createdAt: nowISO()
@@ -683,22 +688,16 @@
 
   function kbExport() {
     var lines = [];
-    lines.push("作息秘書 v19.1｜知識區匯出");
+    lines.push("作息秘書 v19.1.1｜知識區匯出");
     lines.push("篩選：" + kbFilter);
     lines.push("------");
-
     for (var i = 0; i < kbData.length; i++) {
       var it = kbData[i];
       if (!kbMatchesFilter(it)) continue;
       lines.push("【" + it.cat + "】" + it.title);
       lines.push(it.text);
-
-      var link = extractFirstUrl((it.title || "") + " " + (it.text || ""));
-      if (link) lines.push("連結：" + link);
-
       lines.push("");
     }
-
     var out = lines.join("\n");
     openDlg("匯出內容（可全選複製）",
       "<textarea style='width:100%;min-height:240px;border-radius:14px;padding:12px;box-sizing:border-box;'>" +
@@ -709,14 +708,15 @@
 
   function bindKB() {
     kbLoad();
+    kbEnsureOptions();
     kbSetFilter("全部");
 
     if (kbForm) {
-      kbForm.onsubmit = null;
-      kbForm.addEventListener("submit", function (e) {
+      kbForm.onsubmit = function (e) {
         e.preventDefault();
         ttsWarmup();
-        var cat = kbCat ? kbCat.value : "筆記";
+
+        var cat = kbCat ? kbCat.value : "備忘";
         var title = kbTitle ? kbTitle.value : "";
         var text = kbText ? kbText.value : "";
 
@@ -728,42 +728,36 @@
 
         kbAdd(cat, title, text);
         speak("已新增一筆。");
-
         if (kbTitle) kbTitle.value = "";
         if (kbText) kbText.value = "";
         try { kbTitle && kbTitle.focus(); } catch (err) {}
-      });
+      };
     }
 
-    if (kbExportBtn) kbExportBtn.addEventListener("click", function (e) {
+    if (kbExportBtn) kbExportBtn.onclick = function (e) {
       e.preventDefault();
       ttsWarmup();
       kbExport();
-    });
+    };
 
-    if (kbClearBtn) kbClearBtn.addEventListener("click", function (e) {
+    if (kbClearBtn) kbClearBtn.onclick = function (e) {
       e.preventDefault();
       ttsWarmup();
-
-      if (kbData.length === 0) {
-        openDlg("提示", "<p>目前沒有資料可清空。</p>");
-        return;
-      }
+      if (kbData.length === 0) { openDlg("提示", "<p>目前沒有資料可清空。</p>"); return; }
 
       openDlg("確認清空？",
         "<p>這會清空所有知識區資料（永久）。</p>" +
         "<p style='opacity:.8'>若要先備份，請先按「匯出」。</p>"
       );
 
-      dlgOk.onclick = null;
-      dlgOk.addEventListener("click", function handler() {
-        dlgOk.removeEventListener("click", handler);
+      // ✅ v19.1.1：只用 onclick，不累積
+      dlgOk.onclick = function () {
         closeDlg();
         kbClearAll();
         speak("已清空。");
-        bindDialog();
-      });
-    });
+        bindDialog(); // 還原
+      };
+    };
 
     kbRender();
   }
@@ -790,7 +784,6 @@
       if (Array.isArray(arr)) relData = arr;
     } catch (e) { relData = []; }
   }
-
   function relSave() { try { localStorage.setItem(REL_KEY, JSON.stringify(relData)); } catch (e) {} }
   function relMatchesFilter(item) { return (relFilter === "全部") ? true : (item && item.cat === relFilter); }
 
@@ -844,7 +837,6 @@
 
       row.appendChild(metaWrap);
       row.appendChild(right);
-
       relList.appendChild(row);
     }
 
@@ -885,15 +877,13 @@
     relSave();
     relRender();
   }
-
   function relClearAll() { relData = []; relSave(); relRender(); }
 
   function relExport() {
     var lines = [];
-    lines.push("作息秘書 v19.1｜關係滋養區匯出");
+    lines.push("作息秘書 v19.1.1｜關係滋養區匯出");
     lines.push("篩選：" + relFilter);
     lines.push("------");
-
     for (var i = 0; i < relData.length; i++) {
       var it = relData[i];
       if (!relMatchesFilter(it)) continue;
@@ -901,7 +891,6 @@
       lines.push(it.text);
       lines.push("");
     }
-
     var out = lines.join("\n");
     openDlg("匯出內容（可全選複製）",
       "<textarea style='width:100%;min-height:240px;border-radius:14px;padding:12px;box-sizing:border-box;'>" +
@@ -915,10 +904,10 @@
     relSetFilter("全部");
 
     if (relForm) {
-      relForm.onsubmit = null;
-      relForm.addEventListener("submit", function (e) {
+      relForm.onsubmit = function (e) {
         e.preventDefault();
         ttsWarmup();
+
         var cat = relCat ? relCat.value : "自己";
         var title = relTitle ? relTitle.value : "";
         var text = relText ? relText.value : "";
@@ -932,42 +921,33 @@
 
         relAdd(cat, title, text, freq);
         speak("已新增一則關係滋養。");
-
         if (relTitle) relTitle.value = "";
         if (relText) relText.value = "";
         try { relTitle && relTitle.focus(); } catch (err) {}
-      });
+      };
     }
 
-    if (relExportBtn) relExportBtn.addEventListener("click", function (e) {
+    if (relExportBtn) relExportBtn.onclick = function (e) {
+      e.preventDefault(); ttsWarmup(); relExport();
+    };
+
+    if (relClearBtn) relClearBtn.onclick = function (e) {
       e.preventDefault();
       ttsWarmup();
-      relExport();
-    });
-
-    if (relClearBtn) relClearBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      ttsWarmup();
-
-      if (relData.length === 0) {
-        openDlg("提示", "<p>目前沒有資料可清空。</p>");
-        return;
-      }
+      if (relData.length === 0) { openDlg("提示", "<p>目前沒有資料可清空。</p>"); return; }
 
       openDlg("確認清空？",
         "<p>這會清空所有關係滋養資料（永久）。</p>" +
         "<p style='opacity:.8'>若要先備份，請先按「匯出」。</p>"
       );
 
-      dlgOk.onclick = null;
-      dlgOk.addEventListener("click", function handler() {
-        dlgOk.removeEventListener("click", handler);
+      dlgOk.onclick = function () {
         closeDlg();
         relClearAll();
         speak("已清空。");
         bindDialog();
-      });
-    });
+      };
+    };
 
     relRender();
   }
@@ -995,19 +975,11 @@
     if (b) return pad2(parseInt(b[1], 10)) + "-" + pad2(parseInt(b[2], 10));
     return "";
   }
-
   function todayMD() {
-    try {
-      var d = new Date();
-      return pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
-    } catch (e) { return ""; }
+    try { var d = new Date(); return pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); } catch (e) { return ""; }
   }
-
   function nowHM() {
-    try {
-      var d = new Date();
-      return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
-    } catch (e) { return ""; }
+    try { var d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); } catch (e) { return ""; }
   }
 
   function bdayLoad() {
@@ -1019,19 +991,16 @@
       if (Array.isArray(arr)) bdayData = arr;
     } catch (e) { bdayData = []; }
   }
-
   function bdaySave() { try { localStorage.setItem(BDAY_KEY, JSON.stringify(bdayData)); } catch (e) {} }
 
   function bdayShowToday() {
     if (!bdayTodayBox) return;
     var md = todayMD();
     if (!md) return;
-
     var names = [];
     for (var i = 0; i < bdayData.length; i++) {
       if (bdayData[i].md === md) names.push(bdayData[i].name);
     }
-
     if (names.length) {
       bdayTodayBox.style.display = "block";
       bdayTodayBox.innerHTML = "🎂 今天 " + escapeHtml(md) + "：<b>" + escapeHtml(names.join("、")) + "</b>";
@@ -1090,7 +1059,6 @@
 
       row.appendChild(metaWrap);
       row.appendChild(right);
-
       bdayList.appendChild(row);
     }
 
@@ -1125,7 +1093,7 @@
 
   function bdayExport() {
     var lines = [];
-    lines.push("作息秘書 v19.1｜生日提醒匯出");
+    lines.push("作息秘書 v19.1.1｜生日提醒匯出");
     lines.push("------");
     for (var i = 0; i < bdayData.length; i++) {
       var it = bdayData[i];
@@ -1133,14 +1101,15 @@
       lines.push(it.msg || "");
       lines.push("");
     }
+    var out = lines.join("\n");
     openDlg("匯出內容（可全選複製）",
       "<textarea style='width:100%;min-height:240px;border-radius:14px;padding:12px;box-sizing:border-box;'>" +
-      escapeHtml(lines.join("\n")) +
+      escapeHtml(out) +
       "</textarea>"
     );
   }
 
-  async function bdayCheckDue() {
+  function bdayCheckDue() {
     var md = todayMD();
     var hm = nowHM();
     if (!md || !hm) return;
@@ -1150,7 +1119,7 @@
       if (it.md !== md) continue;
       if ((it.time || "09:00") !== hm) continue;
 
-      var lockKey = "sleepSecretary_v19_bday_fired_" + md + "_" + hm + "_" + it.id;
+      var lockKey = "sleepSecretary_v1911_bday_fired_" + md + "_" + hm + "_" + it.id;
       try {
         if (localStorage.getItem(lockKey)) continue;
         localStorage.setItem(lockKey, "1");
@@ -1158,7 +1127,7 @@
 
       var title = "🎂 生日提醒：" + it.name;
       var body = it.msg || "記得祝福";
-      await fireReminder(title, body, "今天是 " + it.name + " 的生日。記得祝福。");
+      fireReminder(title, body, "今天是 " + it.name + " 的生日。記得祝福。");
       openDlg("生日提醒 🎂", "<p><b>" + escapeHtml(it.name) + "</b></p><p>" + escapeHtml(body) + "</p>");
     }
   }
@@ -1168,8 +1137,7 @@
     bdayRender();
 
     if (bdayForm) {
-      bdayForm.onsubmit = null;
-      bdayForm.addEventListener("submit", function (e) {
+      bdayForm.onsubmit = function (e) {
         e.preventDefault();
         ttsWarmup();
 
@@ -1179,355 +1147,43 @@
         var msgVal = bdayMsg ? bdayMsg.value : "";
         var md = normalizeMD(dateVal);
 
-        if (!safeText(name).trim()) {
-          speak("請輸入姓名。");
-          openDlg("提醒", "<p>請輸入「對象」。</p>");
-          return;
-        }
-        if (!md) {
-          speak("請輸入日期。");
-          openDlg("提醒", "<p>請輸入生日日期。</p>");
-          return;
-        }
+        if (!safeText(name).trim()) { speak("請輸入姓名。"); openDlg("提醒", "<p>請輸入「對象」。</p>"); return; }
+        if (!md) { speak("請輸入日期。"); openDlg("提醒", "<p>請輸入生日日期。</p>"); return; }
 
         bdayAdd(name, md, timeVal, msgVal);
         speak("已新增生日提醒。");
-
         if (bdayName) bdayName.value = "";
         if (bdayDate) bdayDate.value = "";
         if (bdayMsg) bdayMsg.value = "";
         try { bdayName && bdayName.focus(); } catch (err) {}
-      });
+      };
     }
 
-    if (bdayExportBtn) bdayExportBtn.addEventListener("click", function (e) {
+    if (bdayExportBtn) bdayExportBtn.onclick = function (e) { e.preventDefault(); ttsWarmup(); bdayExport(); };
+
+    if (bdayClearBtn) bdayClearBtn.onclick = function (e) {
       e.preventDefault();
       ttsWarmup();
-      bdayExport();
-    });
-
-    if (bdayClearBtn) bdayClearBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      ttsWarmup();
-
-      if (bdayData.length === 0) {
-        openDlg("提示", "<p>目前沒有資料可清空。</p>");
-        return;
-      }
+      if (bdayData.length === 0) { openDlg("提示", "<p>目前沒有資料可清空。</p>"); return; }
 
       openDlg("確認清空？", "<p>這會清空所有生日提醒（永久）。</p>");
 
-      dlgOk.onclick = null;
-      dlgOk.addEventListener("click", function handler() {
-        dlgOk.removeEventListener("click", handler);
+      dlgOk.onclick = function () {
         closeDlg();
         bdayClearAll();
         speak("已清空。");
         bindDialog();
-      });
-    });
+      };
+    };
 
     if (bdayTicker) clearInterval(bdayTicker);
     bdayTicker = setInterval(function () { bdayCheckDue(); }, 15000);
-
     bdayShowToday();
     bdayCheckDue();
   }
 
   /* ==========================================================
-  v19.1：今日重要行事（JS-only 注入首頁面板）
-  ========================================================== */
-  var TODAY_KEY = "sleepSecretary_v19_todayTasks";
-  var todayState = { showAll: false, list: [] };
-
-  function ymd(d) {
-    try {
-      d = d || new Date();
-      return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
-    } catch (e) { return ""; }
-  }
-  function isTodayTask(it) {
-    var t = ymd(new Date());
-    if (!it.date) return true;
-    return it.date === t;
-  }
-
-  function todayLoad() {
-    todayState.list = [];
-    try {
-      var raw = localStorage.getItem(TODAY_KEY);
-      if (!raw) return;
-      var arr = JSON.parse(raw);
-      if (Array.isArray(arr)) todayState.list = arr;
-    } catch (e) { todayState.list = []; }
-  }
-  function todaySave() { try { localStorage.setItem(TODAY_KEY, JSON.stringify(todayState.list)); } catch (e) {} }
-
-  function ensureTodayPanel() {
-    var home = $("#view-home");
-    if (!home) return;
-    if ($("#todayPanel")) return;
-
-    var panel = document.createElement("div");
-    panel.className = "panel";
-    panel.id = "todayPanel";
-
-    panel.innerHTML =
-      "<div class='panelHead'>" +
-        "<div class='panelTitle'>📌 今日重要行事</div>" +
-        "<div class='panelHint'>用最小的動作，把今天抓回來。（JS 注入｜不改 HTML）</div>" +
-      "</div>" +
-
-      "<form id='todayForm' class='kbForm' autocomplete='off'>" +
-        "<label class='kbField kbFieldGrow'>" +
-          "<span class='kbLabel'>事項</span>" +
-          "<input id='todayTitle' class='kbInput' type='text' maxlength='60' placeholder='例如：14:30 回診 / 19:00 直播' />" +
-        "</label>" +
-
-        "<label class='kbField'>" +
-          "<span class='kbLabel'>日期</span>" +
-          "<input id='todayDate' class='kbInput' type='date' />" +
-        "</label>" +
-
-        "<label class='kbField'>" +
-          "<span class='kbLabel'>時間</span>" +
-          "<input id='todayTime' class='kbInput' type='time' />" +
-        "</label>" +
-
-        "<button class='btnPrimary' type='submit'>新增</button>" +
-      "</form>" +
-
-      "<div class='kbToolbar'>" +
-        "<div class='kbFilter'>" +
-          "<span class='kbFilterLabel'>顯示：</span>" +
-          "<button id='todayShowToday' class='chip active' type='button'>只看今天</button>" +
-          "<button id='todayShowAll' class='chip' type='button'>看全部</button>" +
-        "</div>" +
-        "<div class='kbActions'>" +
-          "<button id='todayExport' class='btnGhost' type='button'>匯出</button>" +
-          "<button id='todayClear' class='btnGhost danger' type='button'>清空</button>" +
-        "</div>" +
-      "</div>" +
-
-      "<div id='todayEmpty' class='kbEmpty'>今天還沒有安排（或尚未新增）</div>" +
-      "<div id='todayList' class='kbList' aria-live='polite'></div>";
-
-    // 放在首頁最上方（你若要放最下方，改成 home.appendChild(panel)）
-    home.insertBefore(panel, home.firstChild);
-  }
-
-  function todayRender() {
-    var listEl = $("#todayList");
-    var emptyEl = $("#todayEmpty");
-    if (!listEl || !emptyEl) return;
-
-    listEl.innerHTML = "";
-    var shown = 0;
-
-    for (var i = 0; i < todayState.list.length; i++) {
-      var it = todayState.list[i];
-      if (!todayState.showAll && !isTodayTask(it)) continue;
-
-      shown++;
-
-      var row = document.createElement("div");
-      row.className = "kbItem";
-      row.setAttribute("data-id", it.id);
-
-      var meta = document.createElement("div");
-      meta.className = "kbMeta";
-
-      var cat = document.createElement("div");
-      cat.className = "kbCat";
-      var d = safeText(it.date || ymd(new Date()));
-      var tm = safeText(it.time || "");
-      cat.textContent = "📅 " + d + (tm ? ("｜" + tm) : "");
-
-      var title = document.createElement("div");
-      title.className = "kbTitle";
-      title.textContent = safeText(it.title);
-
-      if (it.done) {
-        title.style.opacity = "0.65";
-        title.style.textDecoration = "line-through";
-      }
-
-      meta.appendChild(cat);
-      meta.appendChild(title);
-
-      var right = document.createElement("div");
-      right.className = "kbRight";
-
-      var time = document.createElement("div");
-      time.className = "kbTime";
-      time.textContent = it.createdAt ? safeText(it.createdAt).slice(0, 19).replace("T", " ") : "";
-
-      var btnDone = document.createElement("button");
-      btnDone.className = "kbDel todayDone";
-      btnDone.type = "button";
-      btnDone.textContent = it.done ? "取消完成" : "完成";
-
-      var btnDel = document.createElement("button");
-      btnDel.className = "kbDel todayDel";
-      btnDel.type = "button";
-      btnDel.textContent = "刪除";
-
-      right.appendChild(time);
-      right.appendChild(btnDone);
-      right.appendChild(btnDel);
-
-      row.appendChild(meta);
-      row.appendChild(right);
-      listEl.appendChild(row);
-    }
-
-    emptyEl.style.display = (shown === 0) ? "block" : "none";
-  }
-
-  function todayAdd(title, date, time) {
-    var it = {
-      id: uid("td"),
-      title: safeText(title).trim() || "（未命名）",
-      date: safeText(date).trim(), // 可空：視作今天
-      time: safeText(time).trim(),
-      done: false,
-      createdAt: nowISO()
-    };
-    todayState.list.unshift(it);
-    todaySave();
-    todayRender();
-  }
-
-  function todayToggleDone(id) {
-    id = safeText(id);
-    for (var i = 0; i < todayState.list.length; i++) {
-      if (todayState.list[i].id === id) {
-        todayState.list[i].done = !todayState.list[i].done;
-        break;
-      }
-    }
-    todaySave();
-    todayRender();
-  }
-
-  function todayDelete(id) {
-    id = safeText(id);
-    var next = [];
-    for (var i = 0; i < todayState.list.length; i++) {
-      if (todayState.list[i].id !== id) next.push(todayState.list[i]);
-    }
-    todayState.list = next;
-    todaySave();
-    todayRender();
-  }
-
-  function todayClearAll() {
-    todayState.list = [];
-    todaySave();
-    todayRender();
-  }
-
-  function todayExport() {
-    var lines = [];
-    lines.push("作息秘書 v19.1｜今日重要行事匯出");
-    lines.push("顯示：" + (todayState.showAll ? "全部" : "只看今天"));
-    lines.push("------");
-    for (var i = 0; i < todayState.list.length; i++) {
-      var it = todayState.list[i];
-      if (!todayState.showAll && !isTodayTask(it)) continue;
-      var d = it.date || ymd(new Date());
-      var tm = it.time ? (" " + it.time) : "";
-      lines.push((it.done ? "✅ " : "⬜ ") + "【" + d + tm + "】" + it.title);
-    }
-    openDlg("匯出內容（可全選複製）",
-      "<textarea style='width:100%;min-height:240px;border-radius:14px;padding:12px;box-sizing:border-box;'>" +
-      escapeHtml(lines.join("\n")) +
-      "</textarea>"
-    );
-  }
-
-  function bindTodayTasks() {
-    ensureTodayPanel();
-    todayLoad();
-    todayRender();
-
-    var form = $("#todayForm");
-    var inputTitle = $("#todayTitle");
-    var inputDate = $("#todayDate");
-    var inputTime = $("#todayTime");
-    var btnToday = $("#todayShowToday");
-    var btnAll = $("#todayShowAll");
-    var btnExport = $("#todayExport");
-    var btnClear = $("#todayClear");
-
-    if (form) {
-      form.onsubmit = null;
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-        ttsWarmup();
-
-        var title = inputTitle ? inputTitle.value : "";
-        var date = inputDate ? inputDate.value : "";
-        var time = inputTime ? inputTime.value : "";
-
-        if (!safeText(title).trim()) {
-          speak("請輸入事項。");
-          openDlg("提醒", "<p>請輸入「事項」。</p>");
-          return;
-        }
-
-        todayAdd(title, date, time);
-        speak("已新增。");
-
-        if (inputTitle) inputTitle.value = "";
-        if (inputDate) inputDate.value = "";
-        if (inputTime) inputTime.value = "";
-        try { inputTitle && inputTitle.focus(); } catch (err) {}
-      });
-    }
-
-    if (btnToday) btnToday.addEventListener("click", function (e) {
-      e.preventDefault();
-      todayState.showAll = false;
-      btnToday.classList.add("active");
-      btnAll && btnAll.classList.remove("active");
-      todayRender();
-    });
-
-    if (btnAll) btnAll.addEventListener("click", function (e) {
-      e.preventDefault();
-      todayState.showAll = true;
-      btnAll.classList.add("active");
-      btnToday && btnToday.classList.remove("active");
-      todayRender();
-    });
-
-    if (btnExport) btnExport.addEventListener("click", function (e) {
-      e.preventDefault();
-      todayExport();
-    });
-
-    if (btnClear) btnClear.addEventListener("click", function (e) {
-      e.preventDefault();
-      if (!todayState.list.length) {
-        openDlg("提示", "<p>目前沒有資料可清空。</p>");
-        return;
-      }
-      openDlg("確認清空？", "<p>這會清空所有「今日重要行事」（永久）。</p>");
-      dlgOk.onclick = null;
-      dlgOk.addEventListener("click", function handler() {
-        dlgOk.removeEventListener("click", handler);
-        closeDlg();
-        todayClearAll();
-        speak("已清空。");
-        bindDialog();
-      });
-    });
-  }
-
-  /* ==========================================================
-  Global click delegation（Tabs / Cards / chips / delete）
-  （v19.1：加入 今日重要行事 完成/刪除）
+     Global click delegation（Tabs / Cards / chips / delete）
   ========================================================== */
   function bindGlobalDelegation() {
     document.addEventListener("click", function (e) {
@@ -1536,58 +1192,23 @@
 
       // Tabs
       var tab = closest(t, ".tab[data-view]");
-      if (tab) {
-        e.preventDefault();
-        setActiveView(tab.getAttribute("data-view") || "home");
-        return;
-      }
+      if (tab) { e.preventDefault(); setActiveView(tab.getAttribute("data-view") || "home"); return; }
 
       // Cards
       var card = closest(t, ".card[data-jump]");
-      if (card) {
-        e.preventDefault();
-        setActiveView(card.getAttribute("data-jump") || "home");
-        return;
-      }
+      if (card) { e.preventDefault(); setActiveView(card.getAttribute("data-jump") || "home"); return; }
 
       // KB chips
       var chip = closest(t, ".chip[data-filter]");
-      if (chip) {
-        e.preventDefault();
-        kbSetFilter(chip.getAttribute("data-filter") || "全部");
-        return;
-      }
+      if (chip) { e.preventDefault(); kbSetFilter(chip.getAttribute("data-filter") || "全部"); return; }
 
       // REL chips
       var chip2 = closest(t, ".chip2[data-relfilter]");
-      if (chip2) {
-        e.preventDefault();
-        relSetFilter(chip2.getAttribute("data-relfilter") || "全部");
-        return;
-      }
+      if (chip2) { e.preventDefault(); relSetFilter(chip2.getAttribute("data-relfilter") || "全部"); return; }
 
-      // TODAY done / delete
-      var tdDone = closest(t, ".todayDone");
-      if (tdDone) {
-        e.preventDefault();
-        var tdItem = closest(tdDone, ".kbItem");
-        var tdId = tdItem ? tdItem.getAttribute("data-id") : "";
-        if (tdId) todayToggleDone(tdId);
-        return;
-      }
-
-      var tdDel = closest(t, ".todayDel");
-      if (tdDel) {
-        e.preventDefault();
-        var tdItem2 = closest(tdDel, ".kbItem");
-        var tdId2 = tdItem2 ? tdItem2.getAttribute("data-id") : "";
-        if (tdId2) { todayDelete(tdId2); speak("已刪除。"); }
-        return;
-      }
-
-      // KB delete（排除 REL/BDAY/TODAY）
+      // KB delete
       var kdel = closest(t, ".kbDel");
-      if (kdel && kbList && kbList.contains(kdel) && !closest(kdel, ".relDel") && !closest(kdel, ".bdayDel") && !closest(kdel, ".todayDone") && !closest(kdel, ".todayDel")) {
+      if (kdel && kbList && kbList.contains(kdel) && !closest(kdel, ".relDel") && !closest(kdel, ".bdayDel")) {
         var itemEl = closest(kdel, ".kbItem");
         var id = itemEl ? itemEl.getAttribute("data-id") : "";
         if (id) { kbDelete(id); speak("已刪除。"); }
@@ -1619,32 +1240,27 @@
   function bindInstallHelp() {
     if (!btnInstallHelp) return;
     ensureBtnType(btnInstallHelp);
-    btnInstallHelp.onclick = null;
-    btnInstallHelp.addEventListener("click", function (e) {
+    btnInstallHelp.onclick = function (e) {
       e.preventDefault();
       var html =
         "<p><b>Android（Chrome）</b><br>右上角「⋮」→ <b>加入主畫面</b></p>" +
         "<p><b>iPhone（Safari）</b><br>分享按鈕 → <b>加入主畫面</b></p>" +
         "<p style='opacity:.85'>iOS 系統計時器建議用「捷徑」一鍵啟動（本 App 已自動置頂）。</p>";
       openDlg("安裝教學", html);
-    });
+    };
   }
 
   /* ---------- Init ---------- */
   function init() {
     ensureBtnTypesIn(document);
-
     bindDialog();
     bindInstallHelp();
     bindGlobalDelegation();
 
-    // ✅ 三個倒數一定要綁，否則「開始」不會動
+    // ✅ 三個倒數一定要綁
     bindMicro();
     bindEye();
     bindPomo();
-
-    // ✅ v19.1：今日重要行事（JS-only 注入首頁面板）
-    bindTodayTasks();
 
     // ✅ KB/REL/BDAY
     bindKB();
