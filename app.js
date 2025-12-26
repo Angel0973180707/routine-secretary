@@ -3,7 +3,7 @@
 - 承接 v19：Tabs / Cards / 三種計時器 / Dialog / KB / REL / 生日提醒
 - v19.1.2 新增：
   ✅ 重要行事（首頁插入面板，不改 HTML）
-  ✅ 首頁「今天有事」小提示（自動）
+  ✅ 首頁「今日行事」小提示（自動）
   ✅ 過去重要行事一鍵查看（預設收起）
   ✅ KB 文字若含網址，自動轉為可點連結（target=_blank）
   ✅ 修復常見「改了 JS 變成無法新增」：Dialog OK 綁定不再覆蓋 submit
@@ -811,7 +811,7 @@
       if (panels[i].querySelector("#kbForm")) { insertBefore = panels[i]; break; }
     }
 
-    // 先插入「今天有事」提示（放在 quick cards panel 後面最不干擾）
+    // 先插入「今日行事」提示（放在 quick cards panel 後面最不干擾）
     // 找第一個 panel（通常就是 quick cards）
     var firstPanel = panels.length ? panels[0] : null;
     if (firstPanel && !$("#evtTodayHint")) {
@@ -819,7 +819,7 @@
       hint.id = "evtTodayHint";
       hint.className = "note";
       hint.style.marginTop = "12px";
-      hint.innerHTML = "<div class='noteTitle'>今日重要行事</div><div class='noteText' id='evtTodayHintText'></div>";
+      hint.innerHTML = "<div class='noteTitle'>今日行事</div><div class='noteText' id='evtTodayHintText'></div>";
       // 插到 firstPanel 下面
       firstPanel.parentNode.insertBefore(hint, firstPanel.nextSibling);
     }
@@ -834,7 +834,7 @@
     panel.innerHTML =
       "<div class='panelHead'>" +
         "<div class='panelTitle'>🗓️ 重要行事提醒</div>" +
-        "<div class='panelHint'>新增後：首頁會出現「今天有事」提示；過去行事可一鍵查看（預設收起）。</div>" +
+        "<div class='panelHint'>新增後：首頁會出現「今日行事」提示；過去行事可一鍵查看（預設收起）。</div>" +
       "</div>" +
 
       "<form id='evtForm' class='kbForm' autocomplete='off'>" +
@@ -855,7 +855,7 @@
 
         "<label class='kbField' style='min-width:120px;display:flex;align-items:flex-end;gap:8px;'>" +
           "<input id='evtAmPm' type='checkbox' style='transform:scale(1.2);margin:0 0 6px 0;' />" +
-          "<span style='opacity:.9;font-size:14px;'>上午/下午顯示</span>" +
+          "<span style='opacity:.9;font-size:14px;'>下午</span>" +
         "</label>" +
 
         "<label class='kbField kbFieldGrow'>" +
