@@ -654,7 +654,7 @@
       title: safeText(title).trim() || "（未命名）",
       ymd: safeText(ymd).trim(),
       time: safeText(time).trim() || "",
-      useAmPm: !!useAmPm, // ✅ 勾選：上午下午顯示
+      useAmPm: !!useAmPm, // ✅ 勾選：下午
       note: safeText(note).trim() || "",
       createdAt: nowISO()
     };
@@ -693,7 +693,7 @@
     if (evtTodayHintEl) {
       if (today.length) {
         evtTodayHintEl.style.display = "block";
-        evtTodayHintEl.innerHTML = "🔔 <b>今天有事：</b>" + escapeHtml(today.map(function (x) { return x.title; }).join("、"));
+        evtTodayHintEl.innerHTML = "🔔 <b>今日待辦：</b>" + escapeHtml(today.map(function (x) { return x.title; }).join("、"));
       } else {
         evtTodayHintEl.style.display = "none";
         evtTodayHintEl.innerHTML = "";
