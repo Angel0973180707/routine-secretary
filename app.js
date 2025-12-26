@@ -704,7 +704,7 @@
     if (evtListTodayEl) {
       evtListTodayEl.innerHTML = "";
       if (!today.length) {
-        evtListTodayEl.innerHTML = "<div class='kbEmpty' style='margin-top:8px;'>今天沒有設定的重要行事</div>";
+        evtListTodayEl.innerHTML = "<div class='kbEmpty' style='margin-top:8px;'>今天沒有特別安排</div>";
       } else {
         for (var t = 0; t < today.length; t++) {
           var a = today[t];
